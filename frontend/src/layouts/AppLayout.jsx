@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import BackgroundMain from '@/components/Template/BackgroundMain'
 import Header from '@/components/Template/Header'
 import Sidebar from '@/components/Template/Sidebar'
 import { useBreakpoint } from '@/hooks/use-breakpoint'
@@ -16,7 +17,7 @@ function AppLayout({
   user = defaultUser,
 }) {
   const isDesktop = useBreakpoint('lg')
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   useEffect(() => {
@@ -59,7 +60,13 @@ function AppLayout({
           userRole={user.role}
         />
 
-        <main className="dashboard-main">{children}</main>
+        <main
+          className="dashboard-main"
+          style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate' }}
+        >
+          <BackgroundMain />
+          <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+        </main>
       </div>
 
       <button

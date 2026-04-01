@@ -2,6 +2,8 @@ import { ChevronLeft, ChevronRight, XClose } from '@untitledui/icons'
 import { useEffect, useState } from 'react'
 
 import {
+  defaultNavigationPath,
+  implementedNavigationPaths,
   primaryNavigationItems,
   secondaryNavigationItems,
 } from '@/constants/navigation'
@@ -32,6 +34,10 @@ function SidebarNavItem({ item, active, collapsed, onSelect }) {
       data-tooltip={collapsed ? item.label : undefined}
       aria-current={active ? 'page' : undefined}
       onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+          return
+        }
+
         event.preventDefault()
         onSelect?.(item)
       }}
@@ -61,8 +67,15 @@ function Sidebar({
   }, [activePath])
 
   const handleSelect = (item) => {
-    if (item.href) {
-      setSelectedPath(item.href)
+    if (item.href && implementedNavigationPaths.includes(item.href)) {
+      const nextPath = item.href || defaultNavigationPath
+
+      setSelectedPath(nextPath)
+
+      if (window.location.pathname !== nextPath) {
+        window.history.pushState({}, '', nextPath)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
     }
 
     if (mobileOpen) {

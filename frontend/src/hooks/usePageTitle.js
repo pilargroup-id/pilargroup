@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 
-export function usePageTitle(title) {
+const APP_TITLE = 'Pilar Group'
+
+export function usePageTitle() {
   useEffect(() => {
-    document.title = title
-  }, [title])
+    document.title = APP_TITLE
+  }, [])
 }

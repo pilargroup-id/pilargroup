@@ -6,6 +6,9 @@ import {
   Users01,
 } from '@untitledui/icons'
 
+export const defaultNavigationPath = '/dashboard'
+export const implementedNavigationPaths = ['/dashboard', '/users']
+
 export const primaryNavigationItems = [
   {
     label: 'Dashboard',
@@ -13,8 +16,8 @@ export const primaryNavigationItems = [
     icon: BarChartSquare02,
   },
   {
-    label: 'User',
-    href: '/user',
+    label: 'Users',
+    href: '/users',
     icon: Users01,
   },
   {
