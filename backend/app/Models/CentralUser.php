@@ -27,6 +27,8 @@ class CentralUser extends Authenticatable implements JWTSubject
             'internal_id'  => $this->internal_id,
             'username'     => $this->username,
             'name'         => $this->name,
+            'email'        => $this->email,
+            'phone'        => $this->phone,
             'department'   => $this->department,
             'job_position' => $this->job_position,
             'job_level'    => $this->job_level,

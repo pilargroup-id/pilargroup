@@ -20,9 +20,8 @@ class AuthMiddleware
             $request->merge([
                 'auth_user'    => $payload->toArray(),
                 'user_id'      => $payload->get('sub'),
-                'internal_id'  => $payload->get('internal_id'),
-                'username'     => $payload->get('username'),
-                'name'         => $payload->get('name'),
+                'auth_username' => $payload->get('username'),
+                'auth_name'     => $payload->get('name'),
                 'department'   => $payload->get('department'),
                 'apps'         => $payload->get('apps') ?? [],
             ]);
