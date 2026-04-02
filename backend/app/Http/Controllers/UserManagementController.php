@@ -14,26 +14,31 @@ class UserManagementController extends Controller
     {
         $users = DB::connection('pilargroup')
             ->table('central_users as cu')
-            ->leftJoin('central_user_apps as cua', 'cu.id', '=', 'cua.user_id')
-        ->select(
-            'cu.id',
-            'cu.internal_id',
-            'cu.username',
-            'cu.name',
-            'cu.email',
-            'cu.phone',
-            'cu.department',
-            'cu.job_position',
-            'cu.job_level',
-            'cu.is_active',
-            'cu.created_at',
-            'cu.updated_at',
-            'cua.apps'
-        )
+            ->leftJoin('master_departments as md', 'cu.department_id', '=', 'md.id')
+            ->select(
+                'cu.id',
+                'cu.internal_id',
+                'cu.username',
+                'cu.name',
+                'cu.email',
+                'cu.phone',
+                'cu.department_id',
+                'md.name as department',
+                'cu.job_position',
+                'cu.job_level',
+                'cu.is_active',
+                'cu.created_at',
+                'cu.updated_at'
+            )
             ->orderBy('cu.name')
             ->get()
             ->map(function ($user) {
-                $user->apps = $user->apps ? json_decode($user->apps, true) : [];
+                $user->apps = DB::connection('pilargroup')
+                    ->table('central_user_projects as cup')
+                    ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+                    ->where('cup.user_id', $user->id)
+                    ->pluck('mp.slug')
+                    ->toArray();
                 return $user;
             });
 
@@ -45,17 +50,17 @@ class UserManagementController extends Controller
     {
         // Validation akan throw ValidationException otomatis jika gagal (422)
         $request->validate([
-            'username'     => 'required|string|min:3',
-            'password'     => 'required|string|min:6',
-            'name'         => 'required|string',
-            'email'        => 'nullable|email',
-            'phone'        => 'nullable|string|max:20',
-            'department'   => 'required|string',
-            'job_position' => 'nullable|string',
-            'job_level'    => 'nullable|string',
-            'internal_id'  => 'nullable|integer',
-            'apps'         => 'required|array',
-            'apps.*'       => 'string|in:touchpoint,treeview,ticketing',
+            'username'      => 'required|string|min:3',
+            'password'      => 'required|string|min:6',
+            'name'          => 'required|string',
+            'email'         => 'nullable|email',
+            'phone'         => 'nullable|string|max:20',
+            'department_id' => 'required|integer|exists:pilargroup.master_departments,id',
+            'job_position'  => 'nullable|string',
+            'job_level'     => 'nullable|string',
+            'internal_id'   => 'nullable|integer',
+            'apps'          => 'required|array',
+            'apps.*'        => 'string|exists:pilargroup.master_projects,slug',
         ]);
 
         try {
@@ -87,30 +92,37 @@ class UserManagementController extends Controller
             DB::connection('pilargroup')
                 ->table('central_users')
                 ->insert([
-                    'id'           => $userId,
-                    'internal_id'  => $request->input('internal_id'),
-                    'username'     => $request->input('username'),
-                    'password'     => Hash::make($request->input('password')),
-                    'name'         => $request->input('name'),
-                    'email'        => $request->input('email'),
-                    'phone'        => $request->input('phone'),
-                    'department'   => $request->input('department'),
-                    'job_position' => $request->input('job_position'),
-                    'job_level'    => $request->input('job_level'),
-                    'is_active'    => 1,
-                    'created_at'   => $now,
-                    'updated_at'   => $now,
+                    'id'            => $userId,
+                    'internal_id'   => $request->input('internal_id'),
+                    'username'      => $request->input('username'),
+                    'password'      => Hash::make($request->input('password')),
+                    'name'          => $request->input('name'),
+                    'email'         => $request->input('email'),
+                    'phone'         => $request->input('phone'),
+                    'department_id' => $request->input('department_id'),
+                    'job_position'  => $request->input('job_position'),
+                    'job_level'     => $request->input('job_level'),
+                    'is_active'     => 1,
+                    'created_at'    => $now,
+                    'updated_at'    => $now,
                 ]);
 
-            DB::connection('pilargroup')
-                ->table('central_user_apps')
-                ->insert([
-                    'id'         => Str::uuid()->toString(),
-                    'user_id'    => $userId,
-                    'apps'       => json_encode($request->input('apps')),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+            $projectIds = DB::connection('pilargroup')
+                ->table('master_projects')
+                ->whereIn('slug', $request->input('apps'))
+                ->pluck('id');
+
+            foreach ($projectIds as $projectId) {
+                DB::connection('pilargroup')
+                    ->table('central_user_projects')
+                    ->insert([
+                        'id'         => Str::uuid()->toString(),
+                        'user_id'    => $userId,
+                        'project_id' => $projectId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+            }
 
             return response()->json([
                 'message' => 'User registered successfully',
@@ -128,18 +140,18 @@ class UserManagementController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'username'     => 'nullable|string|min:3',
-            'password'     => 'nullable|string|min:6',
-            'name'         => 'nullable|string',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string|max:20',
-            'department'   => 'nullable|string',
-            'job_position' => 'nullable|string',
-            'job_level'    => 'nullable|string',
-            'internal_id'  => 'nullable|integer',
-            'is_active'    => 'nullable|boolean',
-            'apps'         => 'nullable|array',
-            'apps.*'       => 'string|in:touchpoint,treeview,ticketing',
+            'username'      => 'nullable|string|min:3',
+            'password'      => 'nullable|string|min:6',
+            'name'          => 'nullable|string',
+            'email'         => 'nullable|email',
+            'phone'         => 'nullable|string|max:20',
+            'department_id' => 'nullable|integer|exists:pilargroup.master_departments,id',
+            'job_position'  => 'nullable|string',
+            'job_level'     => 'nullable|string',
+            'internal_id'   => 'nullable|integer',
+            'is_active'     => 'nullable|boolean',
+            'apps'          => 'nullable|array',
+            'apps.*'        => 'string|exists:pilargroup.master_projects,slug',
         ]);
 
         $user = DB::connection('pilargroup')
@@ -167,14 +179,15 @@ class UserManagementController extends Controller
             $updates['username'] = $request->input('username');
         }
 
-        if ($request->input('password'))     $updates['password']     = Hash::make($request->input('password'));
-        if ($request->input('name'))         $updates['name']         = $request->input('name');
-        if ($request->input('email') !== null) $updates['email'] = $request->input('email');
-        if ($request->input('phone') !== null) $updates['phone'] = $request->input('phone');
-        if ($request->input('department'))   $updates['department']   = $request->input('department');
-        if ($request->input('job_position')) $updates['job_position'] = $request->input('job_position');
-        if ($request->input('job_level'))    $updates['job_level']    = $request->input('job_level');
-        
+        if ($request->input('password'))     $updates['password']       = Hash::make($request->input('password'));
+        if ($request->input('name'))         $updates['name']           = $request->input('name');
+        if ($request->input('email') !== null) $updates['email']        = $request->input('email');
+        if ($request->input('phone') !== null) $updates['phone']        = $request->input('phone');
+        if ($request->input('department_id')) $updates['department_id'] = $request->input('department_id');
+        if ($request->input('job_position')) $updates['job_position']   = $request->input('job_position');
+        if ($request->input('job_level'))    $updates['job_level']      = $request->input('job_level');
+        if (!is_null($request->input('is_active'))) $updates['is_active'] = $request->input('is_active');
+
         if ($request->input('internal_id')) {
             $internalIdExists = DB::connection('pilargroup')
                 ->table('central_users')
@@ -187,8 +200,6 @@ class UserManagementController extends Controller
             }
             $updates['internal_id'] = $request->input('internal_id');
         }
-        
-        if (!is_null($request->input('is_active'))) $updates['is_active'] = $request->input('is_active');
 
         DB::connection('pilargroup')
             ->table('central_users')
@@ -196,26 +207,24 @@ class UserManagementController extends Controller
             ->update($updates);
 
         if ($request->input('apps') !== null) {
-            $appExists = DB::connection('pilargroup')
-                ->table('central_user_apps')
-                ->where('user_id', $id)
-                ->exists();
+            $projectIds = DB::connection('pilargroup')
+                ->table('master_projects')
+                ->whereIn('slug', $request->input('apps'))
+                ->pluck('id');
 
-            if ($appExists) {
+            // Hapus semua relasi lama lalu insert baru
+            DB::connection('pilargroup')
+                ->table('central_user_projects')
+                ->where('user_id', $id)
+                ->delete();
+
+            foreach ($projectIds as $projectId) {
                 DB::connection('pilargroup')
-                    ->table('central_user_apps')
-                    ->where('user_id', $id)
-                    ->update([
-                        'apps'       => json_encode($request->input('apps')),
-                        'updated_at' => $now,
-                    ]);
-            } else {
-                DB::connection('pilargroup')
-                    ->table('central_user_apps')
+                    ->table('central_user_projects')
                     ->insert([
                         'id'         => Str::uuid()->toString(),
                         'user_id'    => $id,
-                        'apps'       => json_encode($request->input('apps')),
+                        'project_id' => $projectId,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
@@ -230,8 +239,8 @@ class UserManagementController extends Controller
     {
         $user = DB::connection('pilargroup')
             ->table('central_users as cu')
-            ->leftJoin('central_user_apps as cua', 'cu.id', '=', 'cua.user_id')
-            ->select('cu.*', 'cua.apps')
+            ->leftJoin('master_departments as md', 'cu.department_id', '=', 'md.id')
+            ->select('cu.*', 'md.name as department')
             ->where('cu.id', $id)
             ->first();
 
@@ -239,7 +248,12 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        $user->apps = $user->apps ? json_decode($user->apps, true) : [];
+        $user->apps = DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $id)
+            ->pluck('mp.slug')
+            ->toArray();
 
         return response()->json($user);
     }

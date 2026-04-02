@@ -26,12 +26,12 @@ class AuthController extends Controller
         }
 
         // Ambil semua apps user, tanpa filter spesifik
-        $userApps = DB::connection('pilargroup')
-            ->table('central_user_apps')
-            ->where('user_id', $user->id)
-            ->first();
-
-        $apps = $userApps ? json_decode($userApps->apps, true) : [];
+        $apps = DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $user->id)
+            ->pluck('mp.slug')
+            ->toArray();
 
         $token = JWTAuth::claims(['apps' => $apps])->fromUser($user);
 

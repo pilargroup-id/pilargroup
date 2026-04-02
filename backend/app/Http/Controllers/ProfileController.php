@@ -14,12 +14,14 @@ class ProfileController extends Controller
             'current_password' => 'required',
             'new_username'     => 'nullable|string|min:3',
             'new_password'     => 'nullable|string|min:6',
+            'email' => 'nullable|email',
+            'phone' => 'nullable|string|max:20',
         ]);
 
-        if (!$request->new_username && !$request->new_password) {
+        if (!$request->new_username && !$request->new_password && !$request->email && !$request->phone) {
             return response()->json([
                 'success' => false,
-                'message' => 'Isi minimal new_username atau new_password'
+                'message' => 'Isi minimal new_username atau new_password atau email atau phone untuk mengubah profile',
             ], 422);
         }
 
@@ -61,6 +63,9 @@ class ProfileController extends Controller
             $updates['password'] = Hash::make($request->new_password);
             $changed[] = 'password';
         }
+
+        if ($request->input('email') !== null) { $updates['email'] = $request->input('email'); $changed[] = 'email'; }
+        if ($request->input('phone') !== null) { $updates['phone'] = $request->input('phone'); $changed[] = 'phone'; }
 
         DB::connection('pilargroup')
             ->table('central_users')

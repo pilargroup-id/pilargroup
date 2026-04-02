@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\MasterController;
 
 
 Route::get('/user', function (Request $request) {
@@ -28,4 +29,23 @@ Route::prefix('users')
         Route::post('/', [UserManagementController::class, 'store']);
         Route::get('/{id}', [UserManagementController::class, 'show']);
         Route::put('/{id}', [UserManagementController::class, 'update']);
+    });
+
+Route::prefix('master')
+    ->middleware('auth.central')
+    ->group(function () {
+
+        Route::get('/departments', [MasterController::class, 'getDepartments']);
+        Route::get('/projects', [MasterController::class, 'getProjects']);
+
+        // CRUD master - IT only
+        Route::middleware('it.only')->group(function () {
+            Route::post('/departments', [MasterController::class, 'storeDepartment']);
+            Route::put('/departments/{id}', [MasterController::class, 'updateDepartment']);
+            Route::delete('/departments/{id}', [MasterController::class, 'deleteDepartment']);
+
+            Route::post('/projects', [MasterController::class, 'storeProject']);
+            Route::put('/projects/{id}', [MasterController::class, 'updateProject']);
+            Route::delete('/projects/{id}', [MasterController::class, 'deleteProject']);
+        });
     });
