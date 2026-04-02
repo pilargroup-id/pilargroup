@@ -238,6 +238,22 @@
   color: #34518b;
 }
 
+.login-page__password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.login-page__alert {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(185, 51, 51, 0.18);
+  border-radius: 16px;
+  background: rgba(185, 51, 51, 0.08);
+  color: #a22727;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .login-page__submit {
   display: inline-flex;
   align-items: center;
@@ -261,6 +277,14 @@
     filter 0.22s ease;
 }
 
+.login-page__submit-icon {
+  flex-shrink: 0;
+}
+
+.login-page__submit-icon--spinning {
+  animation: login-submit-spin 0.85s linear infinite;
+}
+
 .login-page__submit:hover {
   transform: translateY(-2px);
   box-shadow: 0 22px 40px rgba(34, 70, 150, 0.34);
@@ -272,6 +296,14 @@
   box-shadow:
     0 0 0 4px rgba(47, 87, 186, 0.16),
     0 22px 40px rgba(34, 70, 150, 0.34);
+}
+
+.login-page__submit:disabled {
+  cursor: wait;
+  transform: none;
+  filter: saturate(0.82);
+  box-shadow: none;
+  opacity: 0.78;
 }
 
 .login-page__meta {
@@ -288,6 +320,16 @@
 
 .login-page__meta-link:hover {
   text-decoration: underline;
+}
+
+@keyframes login-submit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 1160px) {

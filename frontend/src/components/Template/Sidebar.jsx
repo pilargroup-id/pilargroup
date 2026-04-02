@@ -7,6 +7,7 @@ import {
   primaryNavigationItems,
   secondaryNavigationItems,
 } from '@/constants/navigation'
+import { submitLogout } from '@/services/logoutService'
 
 function getInitials(name) {
   return name
@@ -17,34 +18,133 @@ function getInitials(name) {
     .join('')
 }
 
-function SidebarNavItem({ item, active, collapsed, onSelect }) {
+function getItemKey(item) {
+  return item.id ?? item.href ?? item.label
+}
+
+function getGroupKey(item) {
+  return `group:${getItemKey(item)}`
+}
+
+function isItemActive(item, currentPath) {
+  if (item.href === currentPath) {
+    return true
+  }
+
+  return item.children?.some((child) => isItemActive(child, currentPath)) ?? false
+}
+
+function getInitiallyExpandedGroups(items, currentPath) {
+  return items.reduce((expandedGroups, item) => {
+    if (item.children?.length && isItemActive(item, currentPath)) {
+      expandedGroups[getGroupKey(item)] = true
+    }
+
+    return expandedGroups
+  }, {})
+}
+
+function SidebarNavItem({
+  item,
+  selectedPath,
+  collapsed,
+  onSelect,
+  expandedGroups,
+  onToggleGroup,
+  depth = 0,
+}) {
   const Icon = item.icon
+  const hasChildren = item.children?.length > 0
+  const active = isItemActive(item, selectedPath)
+  const expanded = hasChildren ? expandedGroups[getGroupKey(item)] ?? false : false
+  const isButton = hasChildren || !item.href
+  const submenuId = hasChildren ? `${getGroupKey(item)}-submenu` : undefined
   const className = [
     'nav-item',
     active ? 'active' : '',
+    hasChildren ? 'nav-item--accordion' : '',
+    expanded ? 'nav-item--expanded' : '',
+    isButton ? 'nav-item--button' : '',
+    depth > 0 ? 'nav-item--child' : '',
     item.variant === 'danger' ? 'logout-item' : '',
   ]
     .filter(Boolean)
     .join(' ')
 
-  return (
-    <a
-      href={item.href ?? '#'}
-      className={className}
-      data-tooltip={collapsed ? item.label : undefined}
-      aria-current={active ? 'page' : undefined}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
-          return
-        }
-
-        event.preventDefault()
-        onSelect?.(item)
-      }}
-    >
-      <Icon className="nav-icon" size={22} />
+  const content = (
+    <>
+      {Icon ? (
+        <Icon className="nav-icon" size={22} />
+      ) : (
+        <span className="nav-item__bullet" aria-hidden="true" />
+      )}
       <span className="nav-text">{item.label}</span>
-    </a>
+      {hasChildren ? <ChevronRight className="nav-item__chevron" size={18} /> : null}
+    </>
+  )
+
+  const handleClick = (event) => {
+    if (hasChildren) {
+      event.preventDefault()
+      onToggleGroup?.(item)
+      return
+    }
+
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return
+    }
+
+    event.preventDefault()
+    onSelect?.(item)
+  }
+
+  return (
+    <>
+      {isButton ? (
+        <button
+          type="button"
+          className={className}
+          data-tooltip={collapsed ? item.label : undefined}
+          aria-controls={submenuId}
+          aria-current={active && !hasChildren ? 'page' : undefined}
+          aria-expanded={hasChildren ? expanded : undefined}
+          onClick={handleClick}
+        >
+          {content}
+        </button>
+      ) : (
+        <a
+          href={item.href}
+          className={className}
+          data-tooltip={collapsed ? item.label : undefined}
+          aria-current={active ? 'page' : undefined}
+          onClick={handleClick}
+        >
+          {content}
+        </a>
+      )}
+
+      {hasChildren && !collapsed ? (
+        <div
+          id={submenuId}
+          className={`nav-submenu${expanded ? ' expanded' : ''}`}
+          aria-hidden={!expanded}
+        >
+          {item.children.map((child) => (
+            <SidebarNavItem
+              key={getItemKey(child)}
+              item={child}
+              selectedPath={selectedPath}
+              collapsed={collapsed}
+              onSelect={onSelect}
+              expandedGroups={expandedGroups}
+              onToggleGroup={onToggleGroup}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      ) : null}
+    </>
   )
 }
 
@@ -60,13 +160,42 @@ function Sidebar({
   onCloseMobile,
 }) {
   const [selectedPath, setSelectedPath] = useState(activePath)
+  const [expandedGroups, setExpandedGroups] = useState(() =>
+    getInitiallyExpandedGroups([...primaryItems, ...secondaryItems], activePath)
+  )
   const initials = getInitials(userName)
 
   useEffect(() => {
     setSelectedPath(activePath)
   }, [activePath])
 
-  const handleSelect = (item) => {
+  useEffect(() => {
+    const activeGroups = getInitiallyExpandedGroups([...primaryItems, ...secondaryItems], activePath)
+
+    if (Object.keys(activeGroups).length === 0) {
+      return
+    }
+
+    setExpandedGroups((currentGroups) => ({
+      ...currentGroups,
+      ...activeGroups,
+    }))
+  }, [activePath, primaryItems, secondaryItems])
+
+  const handleSelect = async (item) => {
+    if (item.href === '/logout') {
+      if (mobileOpen) {
+        onCloseMobile?.()
+      }
+
+      await submitLogout()
+      return
+    }
+
+    if (!item.href) {
+      return
+    }
+
     if (item.href && implementedNavigationPaths.includes(item.href)) {
       const nextPath = item.href || defaultNavigationPath
 
@@ -81,6 +210,24 @@ function Sidebar({
     if (mobileOpen) {
       onCloseMobile?.()
     }
+  }
+
+  const handleToggleGroup = (item) => {
+    const groupKey = getGroupKey(item)
+
+    if (collapsed) {
+      setExpandedGroups((currentGroups) => ({
+        ...currentGroups,
+        [groupKey]: true,
+      }))
+      onToggleCollapse?.()
+      return
+    }
+
+    setExpandedGroups((currentGroups) => ({
+      ...currentGroups,
+      [groupKey]: !(currentGroups[groupKey] ?? false),
+    }))
   }
 
   const sidebarClassName = [
@@ -132,11 +279,13 @@ function Sidebar({
       <nav className="sidebar-nav" aria-label="Main navigation">
         {primaryItems.map((item) => (
           <SidebarNavItem
-            key={item.href ?? item.label}
+            key={getItemKey(item)}
             item={item}
-            active={item.href === selectedPath}
+            selectedPath={selectedPath}
             collapsed={collapsed}
             onSelect={handleSelect}
+            expandedGroups={expandedGroups}
+            onToggleGroup={handleToggleGroup}
           />
         ))}
       </nav>
@@ -144,11 +293,13 @@ function Sidebar({
       <div className="sidebar-bottom">
         {secondaryItems.map((item) => (
           <SidebarNavItem
-            key={item.href ?? item.label}
+            key={getItemKey(item)}
             item={item}
-            active={item.href === selectedPath}
+            selectedPath={selectedPath}
             collapsed={collapsed}
             onSelect={handleSelect}
+            expandedGroups={expandedGroups}
+            onToggleGroup={handleToggleGroup}
           />
         ))}
       </div>

@@ -1,6 +1,6 @@
 # API Documentation — pilargroup.id (Central Auth)
 
-Base URL: `https://pilargroup.id/api` | Local: `http://localhost:8001/api`
+Base URL: `https://pilargroup.id/api` | Local: `http://localhost:8000/api`
 
 ---
 

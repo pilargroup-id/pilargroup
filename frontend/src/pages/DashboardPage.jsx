@@ -32,7 +32,7 @@ const projects = [
   },
 ]
 
-function DashboardPage() {
+function DashboardPage({ activePath = '/dashboard' }) {
   usePageTitle()
   const [searchQuery, setSearchQuery] = useState('')
   const [isPopupOpen, setPopupOpen] = useState(false)
@@ -99,7 +99,7 @@ function DashboardPage() {
         },
         onRefresh: () => setSearchQuery(''),
         primaryActionLabel: 'Create',
-        activePath: '/dashboard',
+        activePath,
       }}
     >
       <section className="dashboard-content">
@@ -191,6 +191,10 @@ function DashboardPage() {
       ) : null}
     </AppLayout>
   )
+}
+
+export function MasterProjectPage() {
+  return <DashboardPage activePath="/master-project" />
 }
 
 export default DashboardPage

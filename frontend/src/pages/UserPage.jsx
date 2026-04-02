@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { UserPlus01 } from '@untitledui/icons'
 
+import RegisterUserPopup from '@/components/users/RegisterUserPopup'
 import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 
-const users = [
+const initialUsers = [
   {
     id: 'USR-001',
     name: 'Al Fatih',
@@ -70,13 +72,45 @@ function getInitials(name) {
     .join('')
 }
 
+function getNextUserId(users) {
+  const highestUserNumber = users.reduce((highest, user) => {
+    const currentNumber = Number.parseInt(user.id.replace(/\D/g, ''), 10)
+
+    if (Number.isNaN(currentNumber)) {
+      return highest
+    }
+
+    return Math.max(highest, currentNumber)
+  }, 0)
+
+  return `USR-${String(highestUserNumber + 1).padStart(3, '0')}`
+}
+
 function UserPage() {
   usePageTitle()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [userList, setUserList] = useState(initialUsers)
+  const [isRegisterPopupOpen, setRegisterPopupOpen] = useState(false)
+
+  const handleRegisterUser = (formValues) => {
+    setUserList((currentUsers) => [
+      {
+        id: getNextUserId(currentUsers),
+        name: formValues.name,
+        email: formValues.email,
+        division: formValues.division,
+        role: formValues.role,
+        status: 'Pending',
+        lastActive: 'Just now',
+      },
+      ...currentUsers,
+    ])
+    setRegisterPopupOpen(false)
+  }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
-  const filteredUsers = users.filter(({ id, name, email, division, role, status }) => {
+  const filteredUsers = userList.filter(({ id, name, email, division, role, status }) => {
     if (!normalizedSearchQuery) {
       return true
     }
@@ -108,9 +142,23 @@ function UserPage() {
     >
       <section className="dashboard-content">
         <article className="dashboard-panel users-table-card">
-          <div className="dashboard-panel__header">
-            <p className="dashboard-panel__eyebrow">User Directory</p>
-            <h2 className="dashboard-panel__title">Users Table</h2>
+          <div className="dashboard-panel__header users-table-card__header">
+            <div>
+              <p className="dashboard-panel__eyebrow">User Directory</p>
+              <h2 className="dashboard-panel__title">Users Table</h2>
+              <p className="users-table-card__description">
+                Kelola daftar user dan tambahkan user baru lewat popup registrasi.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="users-table-card__action"
+              onClick={() => setRegisterPopupOpen(true)}
+            >
+              <UserPlus01 size={18} aria-hidden="true" />
+              Registrasi User
+            </button>
           </div>
 
           <div className="users-table-wrapper">
@@ -176,6 +224,12 @@ function UserPage() {
           </div>
         </article>
       </section>
+
+      <RegisterUserPopup
+        isOpen={isRegisterPopupOpen}
+        onClose={() => setRegisterPopupOpen(false)}
+        onSubmit={handleRegisterUser}
+      />
     </AppLayout>
   )
 }

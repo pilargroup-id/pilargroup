@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react'
-import { ArrowNarrowRight, Eye, EyeOff, Lock01, User01 } from '@untitledui/icons'
+import {
+  ArrowCircleRight,
+  CircleCut,
+  Eye,
+  EyeOff,
+  LockKeyholeCircle,
+  UserCircle,
+} from '@untitledui/icons'
 
 import logoPiagam from '@/assets/image/logo-piagam2.png'
 import '@/assets/styles/login.css'
+import { defaultNavigationPath } from '@/constants/navigation'
+import { submitLogin } from '@/services/loginService'
 
 function LoginPage() {
-  const [username, setUsername] = useState('fatih')
-  const [password, setPassword] = useState('pilar12345')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     const previousTitle = document.title
@@ -19,8 +30,28 @@ function LoginPage() {
     }
   }, [])
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
+
+    if (isSubmitting) {
+      return
+    }
+
+    setErrorMessage('')
+    setIsSubmitting(true)
+
+    try {
+      await submitLogin({ username, password })
+
+      window.history.replaceState({}, '', defaultNavigationPath)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    } catch (error) {
+      setErrorMessage(
+        error?.message || 'Login gagal. Periksa kembali username dan password Anda.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -55,14 +86,18 @@ function LoginPage() {
             <label className="login-page__field">
               <span className="login-page__label">Username *</span>
               <span className="login-page__input-shell">
-                <User01 className="login-page__input-icon" size={18} />
+                <UserCircle className="login-page__input-icon" size={20} />
                 <input
                   className="login-page__input"
                   type="text"
                   value={username}
-                  onChange={(event) => setUsername(event.target.value)}
+                  onChange={(event) => {
+                    setUsername(event.target.value)
+                    setErrorMessage('')
+                  }}
                   placeholder="Enter your username"
                   autoComplete="username"
+                  disabled={isSubmitting}
                 />
               </span>
             </label>
@@ -70,29 +105,40 @@ function LoginPage() {
             <label className="login-page__field">
               <span className="login-page__label">Password *</span>
               <span className="login-page__input-shell">
-                <Lock01 className="login-page__input-icon" size={18} />
+                <LockKeyholeCircle className="login-page__input-icon" size={20} />
                 <input
                   className="login-page__input"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    setErrorMessage('')
+                  }}
                   placeholder="Enter your password"
                   autoComplete="current-password"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   className="login-page__password-toggle"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword((current) => !current)}
+                  disabled={isSubmitting}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </span>
             </label>
 
-            <button className="login-page__submit" type="submit">
-              <span>Login</span>
-              <ArrowNarrowRight size={18} />
+            {errorMessage ? <p className="login-page__alert">{errorMessage}</p> : null}
+
+            <button className="login-page__submit" type="submit" disabled={isSubmitting}>
+              <span>{isSubmitting ? 'Memproses...' : 'Login'}</span>
+              {isSubmitting ? (
+                <CircleCut className="login-page__submit-icon login-page__submit-icon--spinning" size={18} />
+              ) : (
+                <ArrowCircleRight className="login-page__submit-icon" size={18} />
+              )}
             </button>
           </form>
 

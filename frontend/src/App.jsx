@@ -6,17 +6,28 @@ import {
 } from '@/constants/navigation'
 import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
+import MasterProjectPage from '@/pages/MasterProject'
 import UserPage from '@/pages/UserPage'
+import { isAuthenticated } from '@/services/api'
 import '@/assets/styles/app.css'
 
 const routes = {
   '/dashboard': DashboardPage,
   '/login': LoginPage,
+  '/master-project': MasterProjectPage,
   '/users': UserPage,
 }
 
 function resolvePath(pathname) {
+  if (!isAuthenticated()) {
+    return '/login'
+  }
+
   if (pathname === '/') {
+    return defaultNavigationPath
+  }
+
+  if (pathname === '/login') {
     return defaultNavigationPath
   }
 
