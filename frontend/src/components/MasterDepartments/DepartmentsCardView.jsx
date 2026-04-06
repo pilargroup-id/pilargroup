@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit03, Trash03 } from '@untitledui/icons'
+import { Edit03, Folder, Trash03 } from '@untitledui/icons'
 
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import AppLayout from '@/layouts/AppLayout'
 import {
+  createDepartment,
   deleteDepartment,
   getDepartments,
   updateDepartment,
 } from '@/services/master/getDepartements'
 import DeleteDepartmentPopup from './DeleteDepartmentPopup'
 import EditDepartmentPopup from './EditDepartmentPopup'
+import CreateDepartmentPopup from './CreateDepartmentPopup'
 
 function getEditPayload(formValues) {
   return {
@@ -36,6 +38,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
   const [actionError, setActionError] = useState('')
   const [isSavingDepartment, setIsSavingDepartment] = useState(false)
   const [isDeletingDepartment, setIsDeletingDepartment] = useState(false)
+  const [isCreatingDepartment, setIsCreatingDepartment] = useState(false)
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
@@ -170,6 +173,30 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
     }
   }
 
+  const handleSubmitCreate = async (formValues) => {
+    if (!formValues.name.trim()) {
+      setActionError('Nama department wajib diisi.')
+      return
+    }
+
+    setActionError('')
+    setIsCreatingDepartment(true)
+
+    try {
+      await createDepartment(getEditPayload(formValues))
+      setFeedbackMessage({
+        type: 'success',
+        text: `Department ${formValues.name.trim()} berhasil dibuat.`,
+      })
+      setCreatingDepartment(false)
+      await loadDepartments()
+    } catch (error) {
+      setActionError(error?.message || 'Gagal membuat department.')
+    } finally {
+      setIsCreatingDepartment(false)
+    }
+  }
+
   let content = null
 
   if (isLoadingDepartments) {
@@ -285,9 +312,10 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
             </div>
             <button
               type="button"
-              className="master-departments-create-btn"
+              className="users-table-card__action"
               onClick={handleOpenCreate}
             >
+              <Folder size={18} aria-hidden="true" />
               Create Department
             </button>
           </div>
@@ -318,6 +346,14 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
         errorMessage={deletingDepartment ? actionError : ''}
         onClose={handleCloseDelete}
         onConfirm={handleConfirmDelete}
+      />
+
+      <CreateDepartmentPopup
+        isOpen={creatingDepartment}
+        isSubmitting={isCreatingDepartment}
+        errorMessage={creatingDepartment ? actionError : ''}
+        onClose={handleCloseCreate}
+        onSubmit={handleSubmitCreate}
       />
     </AppLayout>
   )

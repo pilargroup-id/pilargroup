@@ -22,18 +22,27 @@ class MasterController extends Controller
     public function storeDepartment(Request $request)
     {
         $request->validate([
-            'id'   => 'required|integer|unique:pilargroup.master_departments,id',
             'name' => 'required|string|unique:pilargroup.master_departments,name',
         ]);
+
+        $maxId = DB::connection('pilargroup')
+            ->table('master_departments')
+            ->max('id') ?? 0;
+
+        $newId = $maxId + 1;
 
         DB::connection('pilargroup')
             ->table('master_departments')
             ->insert([
-                'id'   => $request->input('id'),
+                'id'   => $newId,
                 'name' => $request->input('name'),
             ]);
 
-        return response()->json(['message' => 'Department created'], 201);
+        return response()->json([
+            'id' => $newId,
+            'name' => $request->input('name'),
+            'message' => 'Department created'
+        ], 201);
     }
 
     public function updateDepartment(Request $request, $id)
