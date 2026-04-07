@@ -19,26 +19,26 @@ class SamlController extends Controller
             'debug'  => env('APP_DEBUG', false),
 
             'idp' => [
-                'entityId'    => 'https://rational-gertie-acquiescently.ngrok-free.dev/saml/metadata',
+                'entityId'    => 'https://pilargroup.id/saml/metadata',
                 'singleSignOnService' => [
-                    'url'     => 'https://rational-gertie-acquiescently.ngrok-free.dev/saml/sso',
+                    'url'     => 'https://pilargroup.id/saml/sso',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                 ],
                 'singleLogoutService' => [
-                    'url'     => 'https://rational-gertie-acquiescently.ngrok-free.dev/saml/slo',
+                    'url'     => 'https://pilargroup.id/saml/slo',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                 ],
                 'x509cert' => $cert,
             ],
 
             'sp' => [
-                'entityId'   => 'https://aset-it.pilargroup.id',
+                'entityId'   => 'https://assetit.pilargroup.id',
                 'assertionConsumerService' => [
-                    'url'     => 'https://aset-it.pilargroup.id/saml/acs',
+                    'url'     => 'https://assetit.pilargroup.id/saml/acs',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
                 ],
                 'singleLogoutService' => [
-                    'url'     => 'https://aset-it.pilargroup.id/saml/slo',
+                    'url'     => 'https://assetit.pilargroup.id/saml/slo',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                 ],
                 'NameIDFormat' => 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
