@@ -142,16 +142,6 @@ function LoginPage() {
             </button>
           </form>
 
-          <p className="login-page__meta">
-            Don&apos;t have an account?{' '}
-            <a
-              className="login-page__meta-link"
-              href="/login"
-              onClick={(event) => event.preventDefault()}
-            >
-              Sign up for free
-            </a>
-          </p>
         </div>
       </div>
     </section>
