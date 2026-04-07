@@ -5,6 +5,11 @@ import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import TableUser from '@/components/Users/TableUser'
+import { normalizePhoneNumber } from '@/utils/normalizePhoneNumber'
+import {
+  matchesDepartmentFilter,
+  useSelectedDepartmentFilterId,
+} from '@/services/departmentFilter'
 import {
   deleteManagedUser,
   getManagedUsers,
@@ -72,7 +77,7 @@ function buildUpdateUserPayload(formValues) {
     payload.email = email
   }
 
-  const phone = formValues.phone.trim()
+  const phone = normalizePhoneNumber(formValues.phone)
   if (phone) {
     payload.phone = phone
   }
@@ -122,6 +127,7 @@ function UserPage() {
   const [isUpdatingUser, setIsUpdatingUser] = useState(false)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+  const selectedDepartmentId = useSelectedDepartmentFilterId()
 
   const loadUsers = async () => {
     setUsersError('')
@@ -144,7 +150,7 @@ function UserPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [normalizedSearchQuery])
+  }, [normalizedSearchQuery, selectedDepartmentId])
 
   const handleRefresh = () => {
     setSearchQuery('')
@@ -262,7 +268,13 @@ function UserPage() {
     }
   }
 
-  const filteredUsers = userList.filter(({ id, name, email, division, role, status }) => {
+  const filteredUsers = userList.filter((user) => {
+    const { id, name, email, division, role, status } = user
+
+    if (!matchesDepartmentFilter(user.raw?.department_id, selectedDepartmentId)) {
+      return false
+    }
+
     if (!normalizedSearchQuery) {
       return true
     }

@@ -3,7 +3,6 @@ import {
   Database01,
   Folder,
   LogOut01,
-  PieChart03,
   Settings01,
   Tool02,
   UserEdit,
@@ -48,11 +47,6 @@ export const primaryNavigationItems = [
       },
     ],
   },
-  {
-    label: 'Analytics',
-    href: '/analytics',
-    icon: PieChart03,
-  },
 ]
 
 export const secondaryNavigationItems = [
@@ -65,6 +59,7 @@ export const secondaryNavigationItems = [
         id: 'change-profile',
         label: 'Change Profile',
         icon: UserEdit,
+        action: 'change-profile',
       },
       {
         id: 'maintenance-info',

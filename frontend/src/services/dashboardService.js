@@ -1,4 +1,5 @@
 import { ApiError, getToken } from '@/services/api'
+import { canAccessProject } from '@/services/accessControl'
 import { getProjects } from '@/services/master/getProjects'
 
 const setupChecklist = [
@@ -28,7 +29,11 @@ function buildProjectLabel(project, index) {
   return `PROJECT ${String(index + 1).padStart(2, '0')}`
 }
 
-function buildProjectDetail(project) {
+function buildProjectDetail(project, hasAccess = true) {
+  if (!hasAccess) {
+    return 'Project tampil, tetapi akses run belum diberikan untuk akun Anda.'
+  }
+
   if (project.descriptionRaw) {
     return project.description
   }
@@ -59,7 +64,27 @@ function buildProjectUrl(projectUrl) {
   }
 }
 
+function getProjectDisabledReason(project, hasAccess = true) {
+  if (!hasAccess) {
+    return 'Anda tidak memiliki akses ke project ini.'
+  }
+
+  if (!project?.isActive) {
+    return 'Project inactive'
+  }
+
+  if (!project?.urlRaw) {
+    return 'URL project belum tersedia'
+  }
+
+  return ''
+}
+
 export function getProjectLaunchUrl(project) {
+  if (!canAccessProject(project)) {
+    throw new ApiError('Anda tidak memiliki akses ke project ini.')
+  }
+
   if (!project?.isActive) {
     throw new ApiError('Project ini sedang inactive dan tidak bisa dijalankan.')
   }
@@ -99,17 +124,38 @@ export function launchProject(project) {
 export async function getDashboardProjects() {
   const projects = await getProjects()
 
-  return projects.map((project, index) => ({
-    ...project,
-    label: buildProjectLabel(project, index),
-    value: project.name,
-    detail: buildProjectDetail(project),
-  }))
+  return projects
+    .map((project, index) => {
+      const hasAccess = canAccessProject(project)
+      const isRunnable = hasAccess && project.isActive && Boolean(project.urlRaw)
+
+      return {
+        ...project,
+        label: buildProjectLabel(project, index),
+        value: project.name,
+        hasAccess,
+        isRunnable,
+        disabledReason: getProjectDisabledReason(project, hasAccess),
+        detail: buildProjectDetail(project, hasAccess),
+        sortIndex: index,
+      }
+    })
+    .sort((projectA, projectB) => {
+      if (projectA.isRunnable === projectB.isRunnable) {
+        return projectA.sortIndex - projectB.sortIndex
+      }
+
+      return projectA.isRunnable ? -1 : 1
+    })
+    .map(({ sortIndex, ...project }) => project)
 }
 
 export async function getDashboardSummary() {
   const projects = await getProjects()
-  const activeProjectsCount = projects.filter((project) => project.isActive).length
+  const launchableProjectsCount = projects.filter(
+    (project) =>
+      canAccessProject(project) && project.isActive && Boolean(project.urlRaw),
+  ).length
   const projectLinksCount = projects.filter((project) => project.urlRaw).length
   const inactiveProjectsCount = projects.filter((project) => !project.isActive).length
 
@@ -117,7 +163,7 @@ export async function getDashboardSummary() {
     {
       label: 'Projects',
       value: formatCount(projects.length),
-      change: `${activeProjectsCount} siap dibuka`,
+      change: `${launchableProjectsCount} siap dibuka`,
       tone: 'positive',
     },
     {

@@ -10,6 +10,56 @@ use App\Models\CentralUser;
 
 class AuthController extends Controller
 {
+    protected function getUserApps(string $userId): array
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $userId)
+            ->whereNotNull('mp.slug')
+            ->pluck('mp.slug')
+            ->filter()
+            ->values()
+            ->toArray();
+    }
+
+    protected function buildAuthUserPayload(CentralUser $user): array
+    {
+        $userProfile = DB::connection('pilargroup')
+            ->table('central_users as cu')
+            ->leftJoin('master_departments as md', 'cu.department_id', '=', 'md.id')
+            ->select(
+                'cu.id',
+                'cu.internal_id',
+                'cu.username',
+                'cu.name',
+                'cu.email',
+                'cu.phone',
+                'cu.department_id',
+                'md.name as department',
+                'cu.job_position',
+                'cu.job_level'
+            )
+            ->where('cu.id', $user->id)
+            ->first();
+
+        $apps = $this->getUserApps($user->id);
+
+        return [
+            'id' => $userProfile?->id ?? $user->id,
+            'internal_id' => $userProfile?->internal_id ?? $user->internal_id,
+            'username' => $userProfile?->username ?? $user->username,
+            'name' => $userProfile?->name ?? $user->name,
+            'email' => $userProfile?->email ?? $user->email,
+            'phone' => $userProfile?->phone ?? $user->phone,
+            'department_id' => $userProfile?->department_id ?? $user->department_id ?? null,
+            'department' => $userProfile?->department ?? null,
+            'job_position' => $userProfile?->job_position ?? $user->job_position,
+            'job_level' => $userProfile?->job_level ?? $user->job_level,
+            'apps' => $apps,
+        ];
+    }
+
     public function login(Request $request)
     {
         $request->validate([
@@ -25,34 +75,29 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        // Ambil semua apps user, tanpa filter spesifik
-        $apps = DB::connection('pilargroup')
-            ->table('central_user_projects as cup')
-            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
-            ->where('cup.user_id', $user->id)
-            ->pluck('mp.slug')
-            ->toArray();
+        $authUser = $this->buildAuthUserPayload($user);
 
-        $token = JWTAuth::claims(['apps' => $apps])->fromUser($user);
+        $token = JWTAuth::claims([
+            'department_id' => $authUser['department_id'],
+            'department' => $authUser['department'],
+            'apps' => $authUser['apps'],
+        ])->fromUser($user);
 
         return response()->json([
             'token' => $token,
-            'user'  => [
-                'id'           => $user->id,
-                'internal_id'  => $user->internal_id,
-                'username'     => $user->username,
-                'name'         => $user->name,
-                'department'   => $user->department,
-                'job_position' => $user->job_position,
-                'job_level'    => $user->job_level,
-                'apps'         => $apps,
-            ]
+            'user'  => $authUser,
         ]);
     }
 
     public function me(Request $request)
     {
-        return response()->json(auth('api')->user());
+        $user = auth('api')->user();
+
+        if (!$user instanceof CentralUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json($this->buildAuthUserPayload($user));
     }
 
     public function logout()

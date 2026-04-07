@@ -156,6 +156,7 @@ function Sidebar({
   userRole = 'Frontend Developer',
   primaryItems = primaryNavigationItems,
   secondaryItems = secondaryNavigationItems,
+  onAction,
   onToggleCollapse,
   onCloseMobile,
 }) {
@@ -189,6 +190,16 @@ function Sidebar({
       }
 
       await submitLogout()
+      return
+    }
+
+    if (item.action) {
+      onAction?.(item.action, item)
+
+      if (mobileOpen) {
+        onCloseMobile?.()
+      }
+
       return
     }
 

@@ -77,6 +77,15 @@ function DashboardPage({ activePath = '/dashboard' }) {
         <p className="dashboard-empty-state__detail">{projectsError}</p>
       </article>
     )
+  } else if (projects.length === 0) {
+    content = (
+      <article className="dashboard-empty-state">
+        <p className="dashboard-empty-state__title">Belum ada project tersedia</p>
+        <p className="dashboard-empty-state__detail">
+          Master project masih kosong atau belum dikonfigurasi.
+        </p>
+      </article>
+    )
   } else if (filteredProjects.length === 0) {
     content = (
       <article className="dashboard-empty-state">
@@ -88,22 +97,26 @@ function DashboardPage({ activePath = '/dashboard' }) {
     )
   } else {
     content = filteredProjects.map((project) => (
-      <article className="dashboard-card" key={project.projectId}>
-        <p className="dashboard-card__label">{project.label}</p>
+      <article
+        className={`dashboard-card${!project.isRunnable ? ' dashboard-card--disabled' : ''}`}
+        key={project.projectId}
+      >
+        <div className="dashboard-card__meta">
+          <p className="dashboard-card__label">{project.label}</p>
+          {!project.isRunnable ? (
+            <span className="dashboard-card__state dashboard-card__state--disabled">
+              Disabled
+            </span>
+          ) : null}
+        </div>
         <strong className="dashboard-card__value">{project.value}</strong>
         <p className="dashboard-card__detail">{project.detail}</p>
         <button
           type="button"
-          className="dashboard-card__action"
+          className={`dashboard-card__action${!project.isRunnable ? ' dashboard-card__action--disabled' : ''}`}
           onClick={() => handleRunProject(project)}
-          disabled={!project.isActive || !project.urlRaw}
-          title={
-            !project.isActive
-              ? 'Project inactive'
-              : !project.urlRaw
-                ? 'URL project belum tersedia'
-                : `Buka ${project.value}`
-          }
+          disabled={!project.isRunnable}
+          title={project.isRunnable ? `Buka ${project.value}` : project.disabledReason}
         >
           <PlayCircle size={16} />
           <span>Run</span>

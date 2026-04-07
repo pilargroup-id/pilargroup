@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
+import { jobLevelOptions } from '@/constants/jobLevels'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
+import { normalizePhoneNumber } from '@/utils/normalizePhoneNumber'
 import {
   normalizeManagedUserApps,
   resolveManagedUserApps,
@@ -81,7 +83,7 @@ function getEditFormState(user) {
     password: '',
     name: getTextValue(rawUser.name),
     email: getTextValue(rawUser.email),
-    phone: getTextValue(rawUser.phone),
+    phone: normalizePhoneNumber(rawUser.phone),
     department_id: getTextValue(rawUser.department_id ?? rawUser.departmentId),
     job_position: getTextValue(rawUser.job_position ?? rawUser.jobPosition),
     job_level: getTextValue(rawUser.job_level ?? rawUser.jobLevel),
@@ -181,10 +183,11 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
   const handleChange = (event) => {
     const { name, value } = event.target
+    const nextValue = name === 'phone' ? normalizePhoneNumber(value) : value
 
     setFormValues((currentValues) => ({
       ...currentValues,
-      [name]: value,
+      [name]: nextValue,
     }))
   }
 
@@ -339,6 +342,8 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
                       onChange={handleChange}
                       placeholder="081234567890"
                       autoComplete="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                     />
                   </label>
 
@@ -375,14 +380,19 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
                   <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Job Level</span>
-                    <input
-                      className="register-user-popup__input"
-                      type="text"
+                    <select
+                      className="register-user-popup__select"
                       name="job_level"
                       value={formValues.job_level}
                       onChange={handleChange}
-                      placeholder="Masukkan level jabatan"
-                    />
+                    >
+                      <option value="">Pilih Job Level</option>
+                      {jobLevelOptions.map((jobLevel) => (
+                        <option key={jobLevel} value={jobLevel}>
+                          {jobLevel}
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   <label className="register-user-popup__field">

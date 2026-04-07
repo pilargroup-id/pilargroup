@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
+import { jobLevelOptions } from '@/constants/jobLevels'
 import { normalizeManagedUserApps, registerUser } from '@/services/manageUsers'
+import { normalizePhoneNumber } from '@/utils/normalizePhoneNumber'
 
 const initialFormState = {
   username: '',
@@ -86,10 +88,11 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
   const handleChange = (event) => {
     const { name, value } = event.target
+    const nextValue = name === 'phone' ? normalizePhoneNumber(value) : value
 
     setFormValues((currentValues) => ({
       ...currentValues,
-      [name]: value,
+      [name]: nextValue,
     }))
   }
 
@@ -133,6 +136,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     let submittedSuccessfully = false
     const selectedApps = normalizeManagedUserApps(formValues.apps)
     const internalIdValue = formValues.internal_id.trim()
+    const phoneValue = normalizePhoneNumber(formValues.phone)
 
     // Validasi department_id
     if (!formValues.department_id) {
@@ -147,7 +151,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         password: formValues.password,
         name: formValues.name.trim(),
         email: formValues.email.trim() || null,
-        phone: formValues.phone.trim() || null,
+        phone: phoneValue || null,
         department_id: parseInt(formValues.department_id),
         job_position: formValues.job_position.trim() || null,
         job_level: formValues.job_level.trim() || null,
@@ -287,6 +291,8 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       onChange={handleChange}
                       placeholder="081234567890"
                       autoComplete="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                     />
                   </label>
 
@@ -323,14 +329,19 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
                   <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Job Level</span>
-                    <input
-                      className="register-user-popup__input"
-                      type="text"
+                    <select
+                      className="register-user-popup__select"
                       name="job_level"
                       value={formValues.job_level}
                       onChange={handleChange}
-                      placeholder="Masukkan level jabatan"
-                    />
+                    >
+                      <option value="">Pilih Job Level</option>
+                      {jobLevelOptions.map((jobLevel) => (
+                        <option key={jobLevel} value={jobLevel}>
+                          {jobLevel}
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   <label className="register-user-popup__field">

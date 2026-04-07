@@ -5,6 +5,11 @@ import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import AppLayout from '@/layouts/AppLayout'
 import {
+  matchesDepartmentFilter,
+  notifyDepartmentCatalogUpdated,
+  useSelectedDepartmentFilterId,
+} from '@/services/departmentFilter'
+import {
   createDepartment,
   deleteDepartment,
   getDepartments,
@@ -39,6 +44,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
   const [isSavingDepartment, setIsSavingDepartment] = useState(false)
   const [isDeletingDepartment, setIsDeletingDepartment] = useState(false)
   const [isCreatingDepartment, setIsCreatingDepartment] = useState(false)
+  const selectedDepartmentId = useSelectedDepartmentFilterId()
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
@@ -65,6 +71,10 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
 
   const filteredDepartments = useMemo(() => {
     return departments.filter(({ id, name }) => {
+      if (!matchesDepartmentFilter(id, selectedDepartmentId)) {
+        return false
+      }
+
       if (!normalizedSearchQuery) {
         return true
       }
@@ -73,7 +83,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
         field.toLowerCase().includes(normalizedSearchQuery),
       )
     })
-  }, [departments, normalizedSearchQuery])
+  }, [departments, normalizedSearchQuery, selectedDepartmentId])
 
   const handleRefresh = () => {
     setSearchQuery('')
@@ -137,6 +147,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
         editingDepartment.departmentId,
         getEditPayload(formValues),
       )
+      notifyDepartmentCatalogUpdated()
       setFeedbackMessage({
         type: 'success',
         text: `Department ${formValues.name.trim()} berhasil diperbarui.`,
@@ -160,6 +171,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
 
     try {
       await deleteDepartment(deletingDepartment.departmentId)
+      notifyDepartmentCatalogUpdated()
       setFeedbackMessage({
         type: 'success',
         text: `Department ${deletingDepartment.name} berhasil dihapus.`,
@@ -184,6 +196,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
 
     try {
       await createDepartment(getEditPayload(formValues))
+      notifyDepartmentCatalogUpdated()
       setFeedbackMessage({
         type: 'success',
         text: `Department ${formValues.name.trim()} berhasil dibuat.`,

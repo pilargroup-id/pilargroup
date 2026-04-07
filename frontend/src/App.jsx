@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 
-import {
-  defaultNavigationPath,
-  implementedNavigationPaths,
-} from '@/constants/navigation'
+import { defaultNavigationPath } from '@/constants/navigation'
 import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
 import MasterDepartementsPage from '@/pages/MasterDepartements'
 import MasterProjectPage from '@/pages/MasterProject'
 import UserPage from '@/pages/UserPage'
 import { isAuthenticated } from '@/services/api'
+import { canAccessPath } from '@/services/accessControl'
 import '@/assets/styles/app.css'
 
 const routes = {
@@ -34,11 +32,7 @@ function resolvePath(pathname) {
   }
 
   if (Object.hasOwn(routes, pathname)) {
-    return pathname
-  }
-
-  if (implementedNavigationPaths.includes(pathname)) {
-    return pathname
+    return canAccessPath(pathname) ? pathname : defaultNavigationPath
   }
 
   return defaultNavigationPath

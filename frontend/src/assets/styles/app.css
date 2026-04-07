@@ -445,7 +445,7 @@
 
 .header-main {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   color: #fff;
   background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -908,6 +908,16 @@
     background 0.3s ease;
 }
 
+.breadcrumb-link--button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .breadcrumb-link:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
@@ -916,6 +926,102 @@
 .breadcrumb-link.active {
   color: var(--accent-gold);
   font-weight: 600;
+}
+
+.breadcrumb-item--group {
+  position: relative;
+}
+
+.breadcrumb-group {
+  position: relative;
+}
+
+.breadcrumb-dropdown-icon {
+  transition: transform 0.2s ease;
+}
+
+.breadcrumb-dropdown-icon.open {
+  transform: rotate(180deg);
+}
+
+.breadcrumb-dropdown {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 0;
+  z-index: 30;
+  min-width: 220px;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(12, 25, 56, 0.96);
+  box-shadow: 0 18px 40px rgba(7, 20, 47, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.breadcrumb-dropdown--floating {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2400;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.breadcrumb-dropdown--floating::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.breadcrumb-dropdown__option {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  display: grid;
+  justify-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.breadcrumb-dropdown__option:hover,
+.breadcrumb-dropdown__option:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.breadcrumb-dropdown__option.active {
+  background: rgba(233, 196, 106, 0.16);
+  color: var(--accent-gold);
+}
+
+.breadcrumb-dropdown__label {
+  font-weight: 600;
+}
+
+.breadcrumb-dropdown__meta {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.74rem;
+}
+
+.breadcrumb-status {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+}
+
+.breadcrumb-status--error {
+  color: #ffb4a2;
 }
 
 .breadcrumb-separator {
@@ -946,6 +1052,27 @@
   display: flex;
   flex-direction: column;
   padding: 22px;
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
+}
+
+.dashboard-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-card--disabled {
+  border-color: rgba(100, 116, 139, 0.22);
+  background:
+    linear-gradient(180deg, rgba(241, 245, 249, 0.92) 0%, rgba(255, 255, 255, 0.88) 100%);
+  box-shadow: 0 18px 36px rgba(100, 116, 139, 0.08);
+  opacity: 0.86;
 }
 
 .dashboard-empty-state {
@@ -980,6 +1107,25 @@
   text-transform: uppercase;
 }
 
+.dashboard-card__state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-card__state--disabled {
+  border: 1px solid rgba(100, 116, 139, 0.16);
+  background: rgba(148, 163, 184, 0.14);
+  color: #475467;
+}
+
 .dashboard-card__value {
   display: block;
   margin-top: 14px;
@@ -992,6 +1138,12 @@
   margin: 12px 0 0;
   color: #51627f;
   line-height: 1.6;
+}
+
+.dashboard-card--disabled .dashboard-card__label,
+.dashboard-card--disabled .dashboard-card__value,
+.dashboard-card--disabled .dashboard-card__detail {
+  color: #667085;
 }
 
 .dashboard-card__action {
@@ -1023,8 +1175,12 @@
   box-shadow: 0 4px 16px rgba(42, 157, 143, 0.5);
 }
 
+.dashboard-card__action--disabled,
 .dashboard-card__action:disabled {
-  opacity: 0.6;
+  border: 1px solid rgba(100, 116, 139, 0.14);
+  background: linear-gradient(135deg, #98a2b3 0%, #667085 100%);
+  color: #fff;
+  opacity: 1;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -1168,6 +1324,10 @@
 
 .dashboard-popup__button--primary:hover {
   box-shadow: 0 14px 30px rgba(42, 157, 143, 0.34);
+}
+
+.dashboard-popup__spinner {
+  animation: dashboard-popup-spin 0.8s linear infinite;
 }
 
 .dashboard-grid {
@@ -2712,6 +2872,16 @@
   }
 }
 
+@keyframes dashboard-popup-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 1024px) {
   .dashboard-shell {
     grid-template-columns: 1fr;
@@ -2815,6 +2985,12 @@
   .header-breadcrumb-content {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .breadcrumb-dropdown {
+    left: 0;
+    right: auto;
+    min-width: min(260px, calc(100vw - 2rem));
   }
 
   .header-toolbar {
