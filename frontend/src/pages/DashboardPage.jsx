@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PlayCircle } from '@untitledui/icons'
+import { Browser } from '@untitledui/icons'
 import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
@@ -118,8 +118,8 @@ function DashboardPage({ activePath = '/dashboard' }) {
           disabled={!project.isRunnable}
           title={project.isRunnable ? `Buka ${project.value}` : project.disabledReason}
         >
-          <PlayCircle size={16} />
-          <span>Run</span>
+          <Browser size={16} />
+          <span>Visit</span>
         </button>
       </article>
     ))
