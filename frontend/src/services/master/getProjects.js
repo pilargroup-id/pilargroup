@@ -147,7 +147,11 @@ export function normalizeProjects(payload) {
 }
 
 export async function getProjects(params) {
-  const payload = await api.request(PROJECTS_PATH, { params })
+  const requestParams = {
+    limit: -1, // Request all projects
+    ...params
+  }
+  const payload = await api.request(PROJECTS_PATH, { params: requestParams })
 
   return normalizeProjects(payload)
 }

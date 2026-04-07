@@ -4,18 +4,17 @@ import { UserPlus01 } from '@untitledui/icons'
 import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
-import { getManagedUsers } from '@/services/manageUsers'
+import TableUser from '@/components/Users/TableUser'
+import {
+  deleteManagedUser,
+  getManagedUsers,
+  updateManagedUser,
+} from '@/services/manageUsers'
+import RegisterUserPopup from '@/components/Users/RegisterUserPopup'
+import EditUserPopup from '@/components/Users/EditUserPopup'
+import DeleteUserPopup from '@/components/Users/DeleteUserPopup'
 
 const USERS_PER_PAGE = 10
-
-function getInitials(name) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
-}
 
 function getPaginationItems(currentPage, totalPages) {
   if (totalPages <= 5) {
@@ -43,6 +42,70 @@ function getPaginationItems(currentPage, totalPages) {
   return paginationItems
 }
 
+function getManagedUserId(user) {
+  return user?.raw?.id ?? user?.userId ?? null
+}
+
+function buildUpdateUserPayload(formValues) {
+  const payload = {
+    is_active: formValues.is_active === 'true',
+    apps: Array.from(new Set(Array.isArray(formValues.apps) ? formValues.apps : [])),
+  }
+
+  const username = formValues.username.trim()
+  if (username) {
+    payload.username = username
+  }
+
+  const password = formValues.password.trim()
+  if (password) {
+    payload.password = password
+  }
+
+  const name = formValues.name.trim()
+  if (name) {
+    payload.name = name
+  }
+
+  const email = formValues.email.trim()
+  if (email) {
+    payload.email = email
+  }
+
+  const phone = formValues.phone.trim()
+  if (phone) {
+    payload.phone = phone
+  }
+
+  const departmentId = Number(formValues.department_id)
+  if (Number.isInteger(departmentId) && departmentId > 0) {
+    payload.department_id = departmentId
+  }
+
+  const jobPosition = formValues.job_position.trim()
+  if (jobPosition) {
+    payload.job_position = jobPosition
+  }
+
+  const jobLevel = formValues.job_level.trim()
+  if (jobLevel) {
+    payload.job_level = jobLevel
+  }
+
+  const internalIdValue = formValues.internal_id.trim()
+  if (!internalIdValue) {
+    payload.internal_id = null
+  } else {
+    const internalId = Number(internalIdValue)
+
+    if (Number.isInteger(internalId) && internalId > 0) {
+      payload.internal_id = internalId
+    }
+  }
+
+  return payload
+}
+
 function UserPage() {
   usePageTitle()
 
@@ -51,6 +114,13 @@ function UserPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
   const [usersError, setUsersError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [isRegisterPopupOpen, setIsRegisterPopupOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [deletingUser, setDeletingUser] = useState(null)
+  const [editUserError, setEditUserError] = useState('')
+  const [deleteUserError, setDeleteUserError] = useState('')
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false)
+  const [isDeletingUser, setIsDeletingUser] = useState(false)
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const loadUsers = async () => {
@@ -82,6 +152,116 @@ function UserPage() {
     void loadUsers()
   }
 
+  const handleRegisterUser = async () => {
+    // Reload users after successful registration
+    await loadUsers()
+  }
+
+  const handleOpenEditUser = (user) => {
+    setDeleteUserError('')
+    setDeletingUser(null)
+    setEditUserError('')
+    setEditingUser(user)
+  }
+
+  const handleCloseEditUser = () => {
+    if (isUpdatingUser) {
+      return
+    }
+
+    setEditUserError('')
+    setEditingUser(null)
+  }
+
+  const handleSubmitEditUser = async (formValues) => {
+    if (!editingUser) {
+      return
+    }
+
+    const userId = getManagedUserId(editingUser)
+
+    if (!userId) {
+      setEditUserError('User ID tidak ditemukan.')
+      return
+    }
+
+    if (!formValues.username.trim()) {
+      setEditUserError('Username wajib diisi.')
+      return
+    }
+
+    if (!formValues.name.trim()) {
+      setEditUserError('Nama user wajib diisi.')
+      return
+    }
+
+    if (!formValues.department_id.trim()) {
+      setEditUserError('Divisi wajib dipilih.')
+      return
+    }
+
+    if (formValues.password.trim() && formValues.password.trim().length < 6) {
+      setEditUserError('Password minimal 6 karakter.')
+      return
+    }
+
+    setEditUserError('')
+    setIsUpdatingUser(true)
+
+    try {
+      const payload = buildUpdateUserPayload(formValues)
+      await updateManagedUser(userId, payload)
+      setEditingUser(null)
+      await loadUsers()
+    } catch (error) {
+      setEditUserError(error?.message || 'Gagal memperbarui user.')
+    } finally {
+      setIsUpdatingUser(false)
+    }
+  }
+
+  const handleOpenDeleteUser = (user) => {
+    setEditUserError('')
+    setEditingUser(null)
+    setDeleteUserError('')
+    setDeletingUser(user)
+  }
+
+  const handleCloseDeleteUser = () => {
+    if (isDeletingUser) {
+      return
+    }
+
+    setDeleteUserError('')
+    setDeletingUser(null)
+  }
+
+  const handleConfirmDeleteUser = async () => {
+    if (!deletingUser) {
+      return
+    }
+
+    const userId = getManagedUserId(deletingUser)
+
+    if (!userId) {
+      setDeleteUserError('User ID tidak ditemukan.')
+      return
+    }
+
+    setDeleteUserError('')
+    setIsDeletingUser(true)
+
+    try {
+      await deleteManagedUser(userId)
+      setDeletingUser(null)
+      await loadUsers()
+    } catch (error) {
+      setDeleteUserError(error?.message || 'Gagal menghapus user.')
+    } finally {
+      setIsDeletingUser(false)
+    }
+  }
+
   const filteredUsers = userList.filter(({ id, name, email, division, role, status }) => {
     if (!normalizedSearchQuery) {
       return true
@@ -91,6 +271,7 @@ function UserPage() {
       field.toLowerCase().includes(normalizedSearchQuery),
     )
   })
+
   const totalUsers = filteredUsers.length
   const totalPages = Math.max(1, Math.ceil(totalUsers / USERS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -101,17 +282,26 @@ function UserPage() {
   const visibleFrom = totalUsers === 0 ? 0 : pageStartIndex + 1
   const visibleTo = Math.min(pageEndIndex, totalUsers)
 
-  let tableMessage = ''
+  const tableMessage = isLoadingUsers
+    ? 'Loading users from database...'
+    : usersError
+      ? usersError
+      : normalizedSearchQuery
+        ? 'No users found. Try another keyword or use refresh to reset the search.'
+        : 'No users available.'
 
-  if (isLoadingUsers) {
-    tableMessage = 'Loading users from database...'
-  } else if (usersError) {
-    tableMessage = usersError
-  } else if (normalizedSearchQuery) {
-    tableMessage = 'No users found. Try another keyword or use refresh to reset the search.'
-  } else {
-    tableMessage = 'No users available.'
-  }
+  const pagination =
+    !isLoadingUsers && !usersError && totalUsers > 0
+      ? {
+          summary: `Showing ${visibleFrom}-${visibleTo} of ${totalUsers} users`,
+          currentPage: safeCurrentPage,
+          totalPages,
+          items: paginationItems,
+          onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
+          onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
+          onSelect: (page) => setCurrentPage(page),
+        }
+      : null
 
   return (
     <AppLayout
@@ -139,139 +329,49 @@ function UserPage() {
             <div>
               <p className="dashboard-panel__eyebrow">User Directory</p>
               <h2 className="dashboard-panel__title">Users Table</h2>
-              <p className="users-table-card__description">
-                Daftar user diambil langsung dari database melalui endpoint user
-                management.
-              </p>
             </div>
 
             <button
               type="button"
               className="users-table-card__action"
-              disabled
-              title="Form registrasi belum disesuaikan dengan payload API /api/users."
+              onClick={() => setIsRegisterPopupOpen(true)}
             >
               <UserPlus01 size={18} aria-hidden="true" />
               Registrasi User
             </button>
           </div>
 
-          <div className="users-table-wrapper">
-            <table className="users-table">
-              <thead>
-                <tr>
-                  <th scope="col">User</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Division</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Last Active</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {paginatedUsers.length > 0 ? (
-                  paginatedUsers.map((user) => (
-                    <tr key={user.userId}>
-                      <td>
-                        <div className="users-table__identity">
-                          <span className="users-table__avatar">{getInitials(user.name)}</span>
-
-                          <div>
-                            <strong className="users-table__name">{user.name}</strong>
-                            <p className="users-table__meta">{user.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {user.email !== '-' ? (
-                          <a
-                            href={`mailto:${user.email}`}
-                            className="users-table__link"
-                            onClick={(event) => event.preventDefault()}
-                          >
-                            {user.email}
-                          </a>
-                        ) : (
-                          user.email
-                        )}
-                      </td>
-                      <td>{user.division}</td>
-                      <td>{user.role}</td>
-                      <td>
-                        <span
-                          className={`users-table__status users-table__status--${user.statusKey}`}
-                        >
-                          {user.status}
-                        </span>
-                      </td>
-                      <td>{user.lastActive}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="users-table__empty">{tableMessage}</div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {!isLoadingUsers && !usersError && totalUsers > 0 ? (
-            <div className="users-table-pagination">
-              <p className="users-table-pagination__summary">
-                Showing {visibleFrom}-{visibleTo} of {totalUsers} users
-              </p>
-
-              <div className="users-table-pagination__controls" aria-label="Users pagination">
-                <button
-                  type="button"
-                  className="users-table-pagination__button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={safeCurrentPage === 1}
-                >
-                  Previous
-                </button>
-
-                {paginationItems.map((item) =>
-                  typeof item === 'number' ? (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`users-table-pagination__button${
-                        item === safeCurrentPage ? ' users-table-pagination__button--active' : ''
-                      }`}
-                      onClick={() => setCurrentPage(item)}
-                      aria-current={item === safeCurrentPage ? 'page' : undefined}
-                    >
-                      {item}
-                    </button>
-                  ) : (
-                    <span
-                      key={item}
-                      className="users-table-pagination__ellipsis"
-                      aria-hidden="true"
-                    >
-                      ...
-                    </span>
-                  ),
-                )}
-
-                <button
-                  type="button"
-                  className="users-table-pagination__button"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={safeCurrentPage === totalPages}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          ) : null}
+          <TableUser
+            users={paginatedUsers}
+            tableMessage={tableMessage}
+            pagination={pagination}
+            onEditUser={handleOpenEditUser}
+            onDeleteUser={handleOpenDeleteUser}
+          />
         </article>
       </section>
+
+      <RegisterUserPopup
+        isOpen={isRegisterPopupOpen}
+        onClose={() => setIsRegisterPopupOpen(false)}
+        onSubmit={handleRegisterUser}
+      />
+
+      <EditUserPopup
+        user={editingUser}
+        isSubmitting={isUpdatingUser}
+        errorMessage={editingUser ? editUserError : ''}
+        onClose={handleCloseEditUser}
+        onSubmit={handleSubmitEditUser}
+      />
+
+      <DeleteUserPopup
+        user={deletingUser}
+        isSubmitting={isDeletingUser}
+        errorMessage={deletingUser ? deleteUserError : ''}
+        onClose={handleCloseDeleteUser}
+        onConfirm={handleConfirmDeleteUser}
+      />
     </AppLayout>
   )
 }

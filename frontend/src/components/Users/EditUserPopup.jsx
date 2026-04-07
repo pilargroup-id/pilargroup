@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
-import { normalizeManagedUserApps, registerUser } from '@/services/manageUsers'
+import {
+  normalizeManagedUserApps,
+  resolveManagedUserApps,
+} from '@/services/manageUsers'
 
 const initialFormState = {
   username: '',
@@ -14,6 +17,7 @@ const initialFormState = {
   job_position: '',
   job_level: '',
   internal_id: '',
+  is_active: 'true',
   apps: [],
 }
 
@@ -36,53 +40,144 @@ function getSelectableProjects(projects) {
   })
 }
 
-function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
-  const [formValues, setFormValues] = useState(initialFormState)
+function haveSameApps(currentApps, nextApps) {
+  if (currentApps.length !== nextApps.length) {
+    return false
+  }
+
+  return currentApps.every((app, index) => app === nextApps[index])
+}
+
+function getTextValue(value) {
+  if (value === undefined || value === null) {
+    return ''
+  }
+
+  return String(value)
+}
+
+function getBooleanSelectValue(value) {
+  if (value === true || value === 1) {
+    return 'true'
+  }
+
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim().toLowerCase()
+
+    if (['true', '1', 'active', 'yes'].includes(normalizedValue)) {
+      return 'true'
+    }
+  }
+
+  return 'false'
+}
+
+function getEditFormState(user) {
+  const rawUser = user?.raw ?? {}
+  const userApps = normalizeManagedUserApps(rawUser.apps ?? user?.apps)
+
+  return {
+    username: getTextValue(rawUser.username),
+    password: '',
+    name: getTextValue(rawUser.name),
+    email: getTextValue(rawUser.email),
+    phone: getTextValue(rawUser.phone),
+    department_id: getTextValue(rawUser.department_id ?? rawUser.departmentId),
+    job_position: getTextValue(rawUser.job_position ?? rawUser.jobPosition),
+    job_level: getTextValue(rawUser.job_level ?? rawUser.jobLevel),
+    internal_id: getTextValue(rawUser.internal_id ?? rawUser.internalId),
+    is_active: getBooleanSelectValue(rawUser.is_active ?? rawUser.isActive ?? user?.statusKey),
+    apps: userApps,
+  }
+}
+
+function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) {
+  const [formValues, setFormValues] = useState(() => getEditFormState(user))
   const [departments, setDepartments] = useState([])
   const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [appsDropdownOpen, setAppsDropdownOpen] = useState(false)
-  const appsListId = 'register-user-popup-apps-list'
-  const visibleProjects = getSelectableProjects(projects)
+  const appsListId = 'edit-user-popup-apps-list'
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!user) {
+      setFormValues(initialFormState)
+      setDepartments([])
+      setProjects([])
       setAppsDropdownOpen(false)
       return undefined
     }
 
+    setFormValues(getEditFormState(user))
+    setAppsDropdownOpen(false)
+  }, [user])
+
+  useEffect(() => {
+    if (!user) {
+      return undefined
+    }
+
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !loading) {
-        setFormValues(initialFormState)
-        setError('')
-        setAppsDropdownOpen(false)
+      if (event.key === 'Escape' && !isSubmitting) {
         onClose?.()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
 
-    // Fetch departments and projects
-    const fetchData = async () => {
-      try {
-        const [depts, projs] = await Promise.all([
-          getDepartments(),
-          getProjects(),
-        ])
-        setDepartments(depts)
-        setProjects(projs)
-      } catch (err) {
-        console.error('Failed to fetch master data:', err)
-      }
-    }
-
-    fetchData()
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose, loading])
+  }, [isSubmitting, onClose, user])
+
+  useEffect(() => {
+    if (!user) {
+      return undefined
+    }
+
+    let isActive = true
+
+    const fetchData = async () => {
+      try {
+        const [depts, projs] = await Promise.all([getDepartments(), getProjects()])
+
+        if (!isActive) {
+          return
+        }
+
+        setDepartments(depts)
+        setProjects(projs)
+        setFormValues((currentValues) => {
+          const resolvedApps = resolveManagedUserApps(currentValues.apps, projs)
+
+          if (haveSameApps(currentValues.apps, resolvedApps)) {
+            return currentValues
+          }
+
+          return {
+            ...currentValues,
+            apps: resolvedApps,
+          }
+        })
+      } catch (error) {
+        console.error('Failed to fetch user edit master data:', error)
+      }
+    }
+
+    void fetchData()
+
+    return () => {
+      isActive = false
+    }
+  }, [user])
+
+  if (!user) {
+    return null
+  }
+
+  const rawUser = user.raw ?? {}
+  const displayName =
+    rawUser.name || (user.name && user.name !== '-' ? user.name : '') || rawUser.username || 'User'
+  const visibleProjects = getSelectableProjects(projects)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -116,67 +211,22 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
   }
 
   const handleClose = () => {
-    if (loading) {
+    if (isSubmitting) {
       return
     }
 
-    setFormValues(initialFormState)
-    setError('')
     setAppsDropdownOpen(false)
     onClose?.()
   }
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault()
-    setLoading(true)
-    setError('')
-    let submittedSuccessfully = false
     const selectedApps = normalizeManagedUserApps(formValues.apps)
-    const internalIdValue = formValues.internal_id.trim()
 
-    // Validasi department_id
-    if (!formValues.department_id) {
-      setError('Divisi wajib dipilih.')
-      setLoading(false)
-      return
-    }
-
-    try {
-      const userData = {
-        username: formValues.username.trim(),
-        password: formValues.password,
-        name: formValues.name.trim(),
-        email: formValues.email.trim() || null,
-        phone: formValues.phone.trim() || null,
-        department_id: parseInt(formValues.department_id),
-        job_position: formValues.job_position.trim() || null,
-        job_level: formValues.job_level.trim() || null,
-        internal_id: internalIdValue ? Number.parseInt(internalIdValue, 10) : null,
-        apps: selectedApps,
-      }
-
-      const response = await registerUser(userData)
-
-      if (typeof onSubmit === 'function') {
-        await onSubmit(response)
-      }
-
-      setFormValues(initialFormState)
-      setAppsDropdownOpen(false)
-      submittedSuccessfully = true
-    } catch (err) {
-      setError(err.message || 'Failed to register user')
-    } finally {
-      setLoading(false)
-    }
-
-    if (submittedSuccessfully) {
-      onClose?.()
-    }
-  }
-
-  if (!isOpen) {
-    return null
+    onSubmit?.({
+      ...formValues,
+      apps: selectedApps,
+    })
   }
 
   return (
@@ -185,23 +235,24 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         className="dashboard-popup register-user-popup register-user-popup--users"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="register-user-popup-title"
-        aria-describedby="register-user-popup-description"
+        aria-labelledby="edit-user-popup-title"
+        aria-describedby="edit-user-popup-description"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="dashboard-popup__header">
           <div>
             <p className="dashboard-popup__eyebrow">User Management</p>
-            <h2 className="dashboard-popup__title" id="register-user-popup-title">
-              Registrasi User
+            <h2 className="dashboard-popup__title" id="edit-user-popup-title">
+              Edit {displayName}
             </h2>
           </div>
 
           <button
             type="button"
             className="dashboard-popup__close"
-            aria-label="Tutup popup registrasi user"
+            aria-label="Tutup popup edit user"
             onClick={handleClose}
+            disabled={isSubmitting}
           >
             <XClose size={18} />
           </button>
@@ -209,15 +260,15 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
         <form className="register-user-popup__form" onSubmit={handleSubmit}>
           <div className="dashboard-popup__body">
-            <p className="dashboard-popup__text" id="register-user-popup-description">
-              Lengkapi data berikut untuk menambahkan user baru ke direktori.
+            <p className="dashboard-popup__text" id="edit-user-popup-description">
+              Perbarui data user yang dipilih. Password bisa dikosongkan jika tidak ingin diganti.
             </p>
 
-            {error && (
-              <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
-                {error}
+            {errorMessage ? (
+              <div className="master-departments-feedback master-departments-feedback--error">
+                {errorMessage}
               </div>
-            )}
+            ) : null}
 
             <div className="register-user-popup__layout">
               <div className="register-user-popup__main">
@@ -232,6 +283,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       onChange={handleChange}
                       placeholder="Masukkan username"
                       autoComplete="username"
+                      minLength={3}
                       required
                     />
                   </label>
@@ -244,9 +296,9 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       name="password"
                       value={formValues.password}
                       onChange={handleChange}
-                      placeholder="Masukkan password"
+                      placeholder="Kosongkan jika tidak diubah"
                       autoComplete="new-password"
-                      required
+                      minLength={6}
                     />
                   </label>
 
@@ -300,9 +352,9 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       required
                     >
                       <option value="">Pilih Divisi</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
+                      {departments.map((department) => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
                         </option>
                       ))}
                     </select>
@@ -342,7 +394,23 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       value={formValues.internal_id}
                       onChange={handleChange}
                       placeholder="Masukkan ID internal user"
+                      step="1"
+                      min="1"
                     />
+                  </label>
+
+                  <label className="register-user-popup__field">
+                    <span className="register-user-popup__label">Status</span>
+                    <select
+                      className="register-user-popup__select"
+                      name="is_active"
+                      value={formValues.is_active}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
                   </label>
                 </div>
               </div>
@@ -359,7 +427,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                   className="register-user-popup__dropdown-button"
                   onClick={() => setAppsDropdownOpen((current) => !current)}
                   aria-expanded={appsDropdownOpen}
-                  aria-controls="register-user-popup-apps-options"
+                  aria-controls="edit-user-popup-apps-options"
                 >
                   <span>
                     {formValues.apps.length === 0
@@ -389,10 +457,10 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                     : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih.`}
                 </p>
 
-                {appsDropdownOpen && (
+                {appsDropdownOpen ? (
                   <div
                     className="register-user-popup__apps-list"
-                    id="register-user-popup-apps-options"
+                    id="edit-user-popup-apps-options"
                   >
                     {visibleProjects.length === 0 ? (
                       <div className="register-user-popup__no-options">
@@ -417,14 +485,17 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                             />
                             <span className="register-user-popup__apps-copy">
                               <span>{project.name}</span>
-                              <small>{project.slug}</small>
+                              <small>
+                                {project.slug}
+                                {!project.isActive ? ' - inactive' : ''}
+                              </small>
                             </span>
                           </label>
                         )
                       })
                     )}
                   </div>
-                )}
+                ) : null}
               </section>
             </div>
           </div>
@@ -434,16 +505,16 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
               type="button"
               className="dashboard-popup__button dashboard-popup__button--secondary"
               onClick={handleClose}
-              disabled={loading}
+              disabled={isSubmitting}
             >
               Batal
             </button>
             <button
               type="submit"
               className="dashboard-popup__button dashboard-popup__button--primary"
-              disabled={loading}
+              disabled={isSubmitting}
             >
-              {loading ? 'Menyimpan...' : 'Simpan User'}
+              {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
           </div>
         </form>
@@ -452,4 +523,4 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
   )
 }
 
-export default RegisterUserPopup
+export default EditUserPopup

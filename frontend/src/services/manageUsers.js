@@ -187,6 +187,78 @@ function normalizeReference(rawUser = {}) {
   )
 }
 
+function normalizeManagedUserApp(app) {
+  if (typeof app === 'string' || typeof app === 'number') {
+    return normalizeOptionalText(app)
+  }
+
+  if (!app || typeof app !== 'object') {
+    return null
+  }
+
+  return (
+    normalizeOptionalText(app.slug ?? app.project_slug ?? app.projectSlug) ??
+    normalizeOptionalText(app.name ?? app.project_name ?? app.projectName) ??
+    normalizeOptionalText(app.id ?? app.project_id ?? app.projectId)
+  )
+}
+
+function normalizeLookupValue(value) {
+  const normalizedValue = normalizeOptionalText(value)
+
+  return normalizedValue ? normalizedValue.toLowerCase() : null
+}
+
+export function normalizeManagedUserApps(apps) {
+  if (!Array.isArray(apps)) {
+    return []
+  }
+
+  return Array.from(
+    new Set(apps.map((app) => normalizeManagedUserApp(app)).filter(Boolean)),
+  )
+}
+
+export function resolveManagedUserApps(apps, projects = []) {
+  const normalizedApps = normalizeManagedUserApps(apps)
+
+  if (normalizedApps.length === 0 || !Array.isArray(projects) || projects.length === 0) {
+    return normalizedApps
+  }
+
+  return Array.from(
+    new Set(
+      normalizedApps
+        .map((app) => {
+          const normalizedApp = normalizeLookupValue(app)
+
+          if (!normalizedApp) {
+            return null
+          }
+
+          const matchedProject = projects.find((project) => {
+            const projectLookupValues = [
+              project?.slug,
+              project?.name,
+              project?.id,
+              project?.projectId,
+              project?.raw?.slug,
+              project?.raw?.name,
+              project?.raw?.id,
+            ]
+              .map((value) => normalizeLookupValue(value))
+              .filter(Boolean)
+
+            return projectLookupValues.includes(normalizedApp)
+          })
+
+          return normalizeOptionalText(matchedProject?.slug ?? matchedProject?.raw?.slug) ?? app
+        })
+        .filter(Boolean),
+    ),
+  )
+}
+
 export function normalizeManagedUser(rawUser = {}) {
   const normalizedStatus = normalizeStatus(rawUser)
 
@@ -212,6 +284,7 @@ export function normalizeManagedUser(rawUser = {}) {
     role: normalizeRole(rawUser),
     status: normalizedStatus.label,
     statusKey: normalizedStatus.key,
+    apps: normalizeManagedUserApps(rawUser.apps),
     lastActive: formatLastActive(
       rawUser.last_active ??
         rawUser.lastActive ??
@@ -243,11 +316,42 @@ export async function getManagedUserById(id) {
   return normalizeManagedUser(payload)
 }
 
+export async function registerUser(userData) {
+  const payload = await api.request(USERS_PATH, {
+    method: 'POST',
+    body: userData,
+  })
+
+  return payload
+}
+
+export async function updateManagedUser(id, userData) {
+  const payload = await api.request(`${USERS_PATH}/${id}`, {
+    method: 'PUT',
+    body: userData,
+  })
+
+  return payload
+}
+
+export async function deleteManagedUser(id) {
+  const payload = await api.request(`${USERS_PATH}/${id}`, {
+    method: 'DELETE',
+  })
+
+  return payload
+}
+
 const manageUsersService = {
   getUsers: getManagedUsers,
   getUserById: getManagedUserById,
+  registerUser,
+  updateUser: updateManagedUser,
+  deleteUser: deleteManagedUser,
   normalizeUser: normalizeManagedUser,
   normalizeUsers: normalizeManagedUsers,
+  normalizeUserApps: normalizeManagedUserApps,
+  resolveUserApps: resolveManagedUserApps,
 }
 
 export default manageUsersService

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { PlayCircle, XClose } from '@untitledui/icons'
+import { PlayCircle } from '@untitledui/icons'
 import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
-import { getDashboardProjects } from '@/services/dashboardService'
+import { getDashboardProjects, launchProject } from '@/services/dashboardService'
 
 function DashboardPage({ activePath = '/dashboard' }) {
   usePageTitle()
@@ -11,8 +11,7 @@ function DashboardPage({ activePath = '/dashboard' }) {
   const [projects, setProjects] = useState([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(true)
   const [projectsError, setProjectsError] = useState('')
-  const [isPopupOpen, setPopupOpen] = useState(false)
-  const [selectedProject, setSelectedProject] = useState(null)
+  const [launchError, setLaunchError] = useState('')
 
   const loadProjects = async () => {
     setProjectsError('')
@@ -33,36 +32,14 @@ function DashboardPage({ activePath = '/dashboard' }) {
     void loadProjects()
   }, [])
 
-  useEffect(() => {
-    if (!isPopupOpen) {
-      return undefined
+  const handleRunProject = (project) => {
+    setLaunchError('')
+
+    try {
+      launchProject(project)
+    } catch (error) {
+      setLaunchError(error?.message || 'Project gagal dijalankan.')
     }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        handleClosePopup()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isPopupOpen])
-
-  const handleOpenPopup = (project) => {
-    setSelectedProject(project)
-    setPopupOpen(true)
-  }
-
-  const handleClosePopup = () => {
-    setPopupOpen(false)
-    setSelectedProject(null)
-  }
-
-  const handleConfirmRun = () => {
-    handleClosePopup()
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
@@ -78,6 +55,7 @@ function DashboardPage({ activePath = '/dashboard' }) {
 
   const handleRefresh = () => {
     setSearchQuery('')
+    setLaunchError('')
     void loadProjects()
   }
 
@@ -117,7 +95,15 @@ function DashboardPage({ activePath = '/dashboard' }) {
         <button
           type="button"
           className="dashboard-card__action"
-          onClick={() => handleOpenPopup(project)}
+          onClick={() => handleRunProject(project)}
+          disabled={!project.isActive || !project.urlRaw}
+          title={
+            !project.isActive
+              ? 'Project inactive'
+              : !project.urlRaw
+                ? 'URL project belum tersedia'
+                : `Buka ${project.value}`
+          }
         >
           <PlayCircle size={16} />
           <span>Run</span>
@@ -148,67 +134,14 @@ function DashboardPage({ activePath = '/dashboard' }) {
       }}
     >
       <section className="dashboard-content">
+        {launchError ? (
+          <div className="master-departments-feedback master-departments-feedback--error">
+            {launchError}
+          </div>
+        ) : null}
+
         <div className="dashboard-overview">{content}</div>
       </section>
-
-      {isPopupOpen && selectedProject ? (
-        <div
-          className="dashboard-popup-overlay"
-          role="presentation"
-          onClick={handleClosePopup}
-        >
-          <div
-            className="dashboard-popup"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="dashboard-run-popup-title"
-            aria-describedby="dashboard-run-popup-description"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="dashboard-popup__header">
-              <div>
-                <p className="dashboard-popup__eyebrow">{selectedProject.label}</p>
-                <h2 className="dashboard-popup__title" id="dashboard-run-popup-title">
-                  Run {selectedProject.value}?
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                className="dashboard-popup__close"
-                aria-label="Close validation popup"
-                onClick={handleClosePopup}
-              >
-                <XClose size={18} />
-              </button>
-            </div>
-
-            <div className="dashboard-popup__body">
-              <p className="dashboard-popup__text" id="dashboard-run-popup-description">
-                Apakah Anda yakin ingin menjalankan project{' '}
-                <strong>{selectedProject.value}</strong>?
-              </p>
-            </div>
-
-            <div className="dashboard-popup__actions">
-              <button
-                type="button"
-                className="dashboard-popup__button dashboard-popup__button--secondary"
-                onClick={handleClosePopup}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="dashboard-popup__button dashboard-popup__button--primary"
-                onClick={handleConfirmRun}
-              >
-                Run
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </AppLayout>
   )
 }

@@ -1,3 +1,4 @@
+import { ApiError, getToken } from '@/services/api'
 import { getProjects } from '@/services/master/getProjects'
 
 const setupChecklist = [
@@ -45,6 +46,54 @@ function buildProjectDetail(project) {
   }
 
   return 'Project is inactive and currently unavailable.'
+}
+
+function buildProjectUrl(projectUrl) {
+  const baseOrigin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+
+  try {
+    return new URL(projectUrl, baseOrigin)
+  } catch {
+    throw new ApiError('URL project tidak valid.')
+  }
+}
+
+export function getProjectLaunchUrl(project) {
+  if (!project?.isActive) {
+    throw new ApiError('Project ini sedang inactive dan tidak bisa dijalankan.')
+  }
+
+  if (!project?.urlRaw) {
+    throw new ApiError('URL project belum tersedia.')
+  }
+
+  const token = getToken()
+
+  if (!token) {
+    throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
+  }
+
+  const launchUrl = buildProjectUrl(project.urlRaw)
+
+  launchUrl.searchParams.set('token', token)
+  launchUrl.searchParams.set('source', 'dashboard-it')
+
+  if (project.slug && project.slug !== 'no-slug') {
+    launchUrl.searchParams.set('project', project.slug)
+  }
+
+  return launchUrl.toString()
+}
+
+export function launchProject(project) {
+  const launchUrl = getProjectLaunchUrl(project)
+
+  if (typeof window !== 'undefined') {
+    window.location.assign(launchUrl)
+  }
+
+  return launchUrl
 }
 
 export async function getDashboardProjects() {
