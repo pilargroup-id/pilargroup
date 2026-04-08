@@ -222,6 +222,8 @@ class SamlController extends Controller
 XML;
 
 \Log::info('SAML Response XML: ' . $samlResponse);
+\Log::info('ACS URL used: ' . $acsUrl);
+\Log::info('Destination in response: ' . $acsUrl);
 
         $encodedResponse = base64_encode($samlResponse);
 
