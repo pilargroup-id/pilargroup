@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use OneLogin\Saml2\Auth as SamlAuth;
-use OneLogin\Saml2\Utils as SamlUtils;
+use Illuminate\Support\Str;
 
 class SamlController extends Controller
 {
@@ -19,7 +18,7 @@ class SamlController extends Controller
             'debug'  => env('APP_DEBUG', false),
 
             'idp' => [
-                'entityId'    => 'https://pilargroup.id/saml/metadata',
+                'entityId' => 'https://pilargroup.id/saml/metadata',
                 'singleSignOnService' => [
                     'url'     => 'https://pilargroup.id/saml/sso',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
@@ -32,7 +31,7 @@ class SamlController extends Controller
             ],
 
             'sp' => [
-                'entityId'   => 'https://assetit.pilargroup.id',
+                'entityId' => 'https://assetit.pilargroup.id',
                 'assertionConsumerService' => [
                     'url'     => 'https://assetit.pilargroup.id/saml/acs',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
@@ -46,7 +45,7 @@ class SamlController extends Controller
         ];
     }
 
-    // GET /saml/metadata → XML metadata untuk diisi ke Snipe-IT
+    // GET /saml/metadata
     public function metadata()
     {
         $certPath = storage_path('app/saml/saml.crt');
@@ -59,69 +58,93 @@ class SamlController extends Controller
         $cert = preg_replace('/-----.*?-----|\s/', '', $certContent);
 
         $idpMetadata = '<?xml version="1.0"?>
-    <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
-        entityID="' . url('/saml/metadata') . '">
-        <md:IDPSSODescriptor WantAuthnRequestsSigned="false"
-            protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-            <md:KeyDescriptor use="signing">
-                <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
-                    <ds:X509Data>
-                        <ds:X509Certificate>' . $cert . '</ds:X509Certificate>
-                    </ds:X509Data>
-                </ds:KeyInfo>
-            </md:KeyDescriptor>
-            <md:KeyDescriptor use="encryption">
-                <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
-                    <ds:X509Data>
-                        <ds:X509Certificate>' . $cert . '</ds:X509Certificate>
-                    </ds:X509Data>
-                </ds:KeyInfo>
-            </md:KeyDescriptor>
-            <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-                Location="' . url('/saml/slo') . '"/>
-            <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
-            <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-                Location="' . url('/saml/sso') . '"/>
-            <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-                Location="' . url('/saml/sso') . '"/>
-        </md:IDPSSODescriptor>
-    </md:EntityDescriptor>';
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+    entityID="' . url('/saml/metadata') . '">
+    <md:IDPSSODescriptor WantAuthnRequestsSigned="false"
+        protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+        <md:KeyDescriptor use="signing">
+            <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                <ds:X509Data>
+                    <ds:X509Certificate>' . $cert . '</ds:X509Certificate>
+                </ds:X509Data>
+            </ds:KeyInfo>
+        </md:KeyDescriptor>
+        <md:KeyDescriptor use="encryption">
+            <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                <ds:X509Data>
+                    <ds:X509Certificate>' . $cert . '</ds:X509Certificate>
+                </ds:X509Data>
+            </ds:KeyInfo>
+        </md:KeyDescriptor>
+        <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+            Location="' . url('/saml/slo') . '"/>
+        <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+        <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+            Location="' . url('/saml/sso') . '"/>
+        <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+            Location="' . url('/saml/sso') . '"/>
+    </md:IDPSSODescriptor>
+</md:EntityDescriptor>';
 
         return response($idpMetadata, 200)->header('Content-Type', 'application/xml');
     }
 
-    // GET /saml/sso → handle login request dari Snipe-IT
+    // GET|POST /saml/sso
     public function sso(Request $request)
     {
         if (!$request->has('SAMLRequest')) {
             return redirect('/');
         }
 
-        $saml = new SamlAuth($this->getSamlSettings());
-
-        // Parse SAMLRequest untuk ambil ACS URL
         $samlRequest = $request->get('SAMLRequest');
         $relayState  = $request->get('RelayState', '');
 
-        // Decode SAMLRequest untuk ambil ACS URL
-        $decodedRequest = gzinflate(base64_decode($samlRequest));
-        $xml = simplexml_load_string($decodedRequest);
-        $acsUrl = (string) $xml->attributes()['AssertionConsumerServiceURL'] ?? 'https://aset-it.pilargroup.id/saml/acs';
+        // Decode ACS URL dari SAMLRequest
+        try {
+            $decoded = base64_decode($samlRequest);
+            // Coba gzinflate dulu, kalau gagal pakai raw decoded
+            $xml = @gzinflate($decoded);
+            if ($xml === false) {
+                $xml = $decoded;
+            }
+            $xmlObj = simplexml_load_string($xml);
+            $acsUrl = (string) ($xmlObj->attributes()['AssertionConsumerServiceURL'] ?? '');
+        } catch (\Exception $e) {
+            $acsUrl = '';
+        }
 
-        // Simpan ke session
-        session([
-            'saml_request'     => $samlRequest,
-            'saml_relay_state' => $relayState,
-            'saml_acs_url'     => $acsUrl,
+        // Fallback ACS URL
+        if (empty($acsUrl)) {
+            $acsUrl = 'https://assetit.pilargroup.id/saml/acs';
+        }
+
+        // Simpan ke DB
+        $samlToken = Str::uuid()->toString();
+        DB::table('saml_pending_requests')->insert([
+            'id'           => $samlToken,
+            'saml_request' => $samlRequest,
+            'relay_state'  => $relayState,
+            'acs_url'      => $acsUrl,
+            'created_at'   => now(),
         ]);
 
-        // Redirect ke halaman login pilargroup
-        return redirect('/login?saml=1');
+        // Redirect ke frontend login dengan saml_token
+        return redirect("https://pilargroup.id/login?saml_token={$samlToken}");
     }
 
-    // POST /saml/response → dipanggil setelah user berhasil login di pilargroup
-    public function sendResponse(string $userId, string $relayState = '')
+    // Dipanggil dari /api/saml/respond (setelah user login)
+    public function sendResponse(string $userId, string $samlToken)
     {
+        // Ambil pending request dari DB
+        $pending = DB::table('saml_pending_requests')
+            ->where('id', $samlToken)
+            ->first();
+
+        if (!$pending) {
+            abort(400, 'Invalid or expired SAML token');
+        }
+
+        // Ambil user
         $user = DB::connection('pilargroup')
             ->table('central_users')
             ->where('id', $userId)
@@ -129,70 +152,137 @@ class SamlController extends Controller
             ->first();
 
         if (!$user) {
-            abort(403, 'User not found');
+            abort(403, 'User not found or inactive');
         }
 
-        $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));
+        // Hapus pending request (one-time use)
+        DB::table('saml_pending_requests')->where('id', $samlToken)->delete();
+
+        // Load cert dan key
         $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
-        $cert = preg_replace('/-----.*?-----|\s/', '', $certContent);
-        $key  = preg_replace('/-----.*?-----|\s/', '', $keyContent);
+        $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));
 
-        // Build SAML Response
-        $now        = gmdate('Y-m-d\TH:i:s\Z');
+        $acsUrl     = $pending->acs_url;
+        $relayState = $pending->relay_state ?? '';
+
+        // Build SAML Response XML
+        $now          = gmdate('Y-m-d\TH:i:s\Z');
         $notOnOrAfter = gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 hour'));
-        $responseId = '_' . bin2hex(random_bytes(16));
-        $assertionId = '_' . bin2hex(random_bytes(16));
+        $responseId   = '_' . bin2hex(random_bytes(16));
+        $assertionId  = '_' . bin2hex(random_bytes(16));
+        $issuer       = $this->getSamlSettings()['idp']['entityId'];
 
-        $acsUrl = session('saml_acs_url', '');
+        $assertionXml = <<<XML
+<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+    ID="{$assertionId}" Version="2.0" IssueInstant="{$now}">
+    <saml:Issuer>{$issuer}</saml:Issuer>
+    <saml:Subject>
+        <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">{$user->username}</saml:NameID>
+        <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+            <saml:SubjectConfirmationData NotOnOrAfter="{$notOnOrAfter}" Recipient="{$acsUrl}"/>
+        </saml:SubjectConfirmation>
+    </saml:Subject>
+    <saml:Conditions NotBefore="{$now}" NotOnOrAfter="{$notOnOrAfter}">
+        <saml:AudienceRestriction>
+            <saml:Audience>https://assetit.pilargroup.id</saml:Audience>
+        </saml:AudienceRestriction>
+    </saml:Conditions>
+    <saml:AttributeStatement>
+        <saml:Attribute Name="username">
+            <saml:AttributeValue>{$user->username}</saml:AttributeValue>
+        </saml:Attribute>
+        <saml:Attribute Name="email">
+            <saml:AttributeValue>{$user->email}</saml:AttributeValue>
+        </saml:Attribute>
+        <saml:Attribute Name="name">
+            <saml:AttributeValue>{$user->name}</saml:AttributeValue>
+        </saml:Attribute>
+    </saml:AttributeStatement>
+</saml:Assertion>
+XML;
+
+        // Sign assertion pakai saml.key
+        $signedAssertion = $this->signXml($assertionXml, $keyContent, $certContent);
 
         $samlResponse = <<<XML
-        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-            ID="{$responseId}" Version="2.0" IssueInstant="{$now}"
-            Destination="{$acsUrl}">
-            <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
-                {$this->getSamlSettings()['idp']['entityId']}
-            </saml:Issuer>
-            <samlp:Status>
-                <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-            </samlp:Status>
-            <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                ID="{$assertionId}" Version="2.0" IssueInstant="{$now}">
-                <saml:Issuer>{$this->getSamlSettings()['idp']['entityId']}</saml:Issuer>
-                <saml:Subject>
-                    <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">
-                        {$user->username}
-                    </saml:NameID>
-                    <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-                        <saml:SubjectConfirmationData NotOnOrAfter="{$notOnOrAfter}"
-                            Recipient="{$acsUrl}"/>
-                    </saml:SubjectConfirmation>
-                </saml:Subject>
-                <saml:AttributeStatement>
-                    <saml:Attribute Name="username">
-                        <saml:AttributeValue>{$user->username}</saml:AttributeValue>
-                    </saml:Attribute>
-                    <saml:Attribute Name="email">
-                        <saml:AttributeValue>{$user->email}</saml:AttributeValue>
-                    </saml:Attribute>
-                    <saml:Attribute Name="name">
-                        <saml:AttributeValue>{$user->name}</saml:AttributeValue>
-                    </saml:Attribute>
-                </saml:AttributeStatement>
-            </saml:Assertion>
-        </samlp:Response>
-        XML;
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    ID="{$responseId}" Version="2.0" IssueInstant="{$now}"
+    Destination="{$acsUrl}">
+    <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{$issuer}</saml:Issuer>
+    <samlp:Status>
+        <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+    </samlp:Status>
+    {$signedAssertion}
+</samlp:Response>
+XML;
 
         $encodedResponse = base64_encode($samlResponse);
 
-        // Auto-submit form ke Snipe-IT ACS URL
         return view('saml.response', [
-            'acs_url'        => $acsUrl,
-            'saml_response'  => $encodedResponse,
-            'relay_state'    => $relayState,
+            'acs_url'       => $acsUrl,
+            'saml_response' => $encodedResponse,
+            'relay_state'   => $relayState,
         ]);
     }
 
-    // GET /saml/slo → handle logout
+    // Sign XML dengan private key (XMLDSig)
+    private function signXml(string $xml, string $privateKeyPem, string $certPem): string
+    {
+        $doc = new \DOMDocument();
+        $doc->loadXML($xml);
+
+        $id   = $doc->documentElement->getAttribute('ID');
+        $c14n = $doc->documentElement->C14N(true, false);
+
+        $digest = base64_encode(hash('sha256', $c14n, true));
+
+        $signedInfoXml = '<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
+            . '<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>'
+            . '<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>'
+            . '<ds:Reference URI="#' . $id . '">'
+            . '<ds:Transforms>'
+            . '<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>'
+            . '<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>'
+            . '</ds:Transforms>'
+            . '<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>'
+            . '<ds:DigestValue>' . $digest . '</ds:DigestValue>'
+            . '</ds:Reference>'
+            . '</ds:SignedInfo>';
+
+        $siDoc = new \DOMDocument();
+        $siDoc->loadXML($signedInfoXml);
+        $c14nSI = $siDoc->documentElement->C14N(true, false);
+
+        openssl_sign($c14nSI, $sigBytes, openssl_pkey_get_private($privateKeyPem), OPENSSL_ALGO_SHA256);
+        $sigValue = base64_encode($sigBytes);
+
+        $cert = preg_replace('/-----.*?-----|\s/', '', $certPem);
+
+        $sigNode = $doc->importNode($siDoc->documentElement->ownerDocument->createElement('placeholder'), true);
+
+        $sigDoc = new \DOMDocument();
+        $sigDoc->loadXML(
+            '<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
+            . $signedInfoXml
+            . '<ds:SignatureValue>' . $sigValue . '</ds:SignatureValue>'
+            . '<ds:KeyInfo><ds:X509Data><ds:X509Certificate>' . $cert . '</ds:X509Certificate></ds:X509Data></ds:KeyInfo>'
+            . '</ds:Signature>'
+        );
+
+        $importedSig = $doc->importNode($sigDoc->documentElement, true);
+
+        $issuerList = $doc->getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'Issuer');
+        if ($issuerList->length > 0) {
+            $issuer = $issuerList->item(0);
+            $issuer->parentNode->insertBefore($importedSig, $issuer->nextSibling);
+        } else {
+            $doc->documentElement->appendChild($importedSig);
+        }
+
+        return $doc->saveXML($doc->documentElement);
+    }
+
+    // GET /saml/slo
     public function slo()
     {
         session()->forget(['saml_request', 'saml_relay_state', 'saml_acs_url']);

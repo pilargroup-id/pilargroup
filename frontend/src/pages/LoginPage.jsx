@@ -32,19 +32,41 @@ function LoginPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-
-    if (isSubmitting) {
-      return
-    }
+    if (isSubmitting) return
 
     setErrorMessage('')
     setIsSubmitting(true)
 
     try {
-      await submitLogin({ username, password })
+      const { token } = await submitLogin({ username, password })
+
+      const params    = new URLSearchParams(window.location.search)
+      const samlToken = params.get('saml_token')
+
+      if (samlToken && token) {
+        const res = await fetch('/api/saml/respond', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ saml_token: samlToken }),
+        })
+
+        if (!res.ok) {
+          throw new Error('SAML authentication failed.')
+        }
+
+        const html = await res.text()
+        document.open()
+        document.write(html)
+        document.close()
+        return
+      }
 
       window.history.replaceState({}, '', defaultNavigationPath)
       window.dispatchEvent(new PopStateEvent('popstate'))
+
     } catch (error) {
       setErrorMessage(
         error?.message || 'Login gagal. Periksa kembali username dan password Anda.',

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MasterController;
+use App\Http\Controllers\SamlController;
 
 
 Route::get('/user', function (Request $request) {
@@ -49,4 +50,15 @@ Route::prefix('master')
             Route::put('/projects/{id}', [MasterController::class, 'updateProject']);
             Route::delete('/projects/{id}', [MasterController::class, 'deleteProject']);
         });
+    });
+
+Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
+    ->post('/saml/respond', function (\Illuminate\Http\Request $request) {
+        $request->validate(['saml_token' => 'required|uuid']);
+
+        // user_id sudah di-inject oleh AuthMiddleware
+        $userId = $request->user_id;
+
+        return app(\App\Http\Controllers\SamlController::class)
+            ->sendResponse($userId, $request->saml_token);
     });
