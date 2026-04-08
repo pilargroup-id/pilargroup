@@ -113,6 +113,11 @@ class SamlController extends Controller
             $acsUrl = '';
         }
 
+        // Force HTTPS protocol for production (handle Cloudflare redirect)
+        if (!empty($acsUrl) && strpos($acsUrl, 'http://') === 0) {
+            $acsUrl = str_replace('http://', 'https://', $acsUrl);
+        }
+
         // Fallback ACS URL
         if (empty($acsUrl)) {
             $acsUrl = env('APP_SAML_ACS_URL', 'https://assetit.pilargroup.id/saml/acs');
