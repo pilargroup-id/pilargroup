@@ -31,13 +31,13 @@ class SamlController extends Controller
             ],
 
             'sp' => [
-                'entityId' => 'http://assetit.pilargroup.id',
+                'entityId' => env('APP_SAML_SP_ENTITY_ID', 'http://assetit.pilargroup.id'),
                 'assertionConsumerService' => [
-                    'url'     => 'http://assetit.pilargroup.id/saml/acs',
+                    'url'     => env('APP_SAML_ACS_URL', 'http://assetit.pilargroup.id/saml/acs'),
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
                 ],
                 'singleLogoutService' => [
-                    'url'     => 'http://assetit.pilargroup.id/saml/slo',
+                    'url'     => env('APP_SAML_SLO_URL', 'http://assetit.pilargroup.id/saml/slo'),
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                 ],
                 'NameIDFormat' => 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
