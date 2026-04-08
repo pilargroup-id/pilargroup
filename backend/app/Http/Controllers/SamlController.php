@@ -238,11 +238,11 @@ XML;
     private function signXml(string $xml, string $privateKeyPem, string $certPem): string
     {
         $doc = new \DOMDocument();
-        $doc->loadXML($xml);
+        $doc->preserveWhiteSpace = false;
+        $doc->loadXML(trim($xml));
 
         $id   = $doc->documentElement->getAttribute('ID');
         $c14n = $doc->documentElement->C14N(true, false);
-
         $digest = base64_encode(hash('sha256', $c14n, true));
 
         $signedInfoXml = '<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
@@ -267,8 +267,6 @@ XML;
 
         $cert = preg_replace('/-----.*?-----|\s/', '', $certPem);
 
-        $sigNode = $doc->importNode($siDoc->documentElement->ownerDocument->createElement('placeholder'), true);
-
         $sigDoc = new \DOMDocument();
         $sigDoc->loadXML(
             '<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
@@ -282,8 +280,8 @@ XML;
 
         $issuerList = $doc->getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'Issuer');
         if ($issuerList->length > 0) {
-            $issuer = $issuerList->item(0);
-            $issuer->parentNode->insertBefore($importedSig, $issuer->nextSibling);
+            $issuerNode = $issuerList->item(0);
+            $issuerNode->parentNode->insertBefore($importedSig, $issuerNode->nextSibling);
         } else {
             $doc->documentElement->appendChild($importedSig);
         }
