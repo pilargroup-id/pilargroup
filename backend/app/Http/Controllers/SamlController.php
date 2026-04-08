@@ -221,6 +221,8 @@ class SamlController extends Controller
 </samlp:Response>
 XML;
 
+\Log::info('SAML Response XML: ' . $samlResponse);
+
         $encodedResponse = base64_encode($samlResponse);
 
         return view('saml.response', [
