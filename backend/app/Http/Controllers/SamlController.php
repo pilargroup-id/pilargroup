@@ -115,7 +115,7 @@ class SamlController extends Controller
 
         // Fallback ACS URL
         if (empty($acsUrl)) {
-            $acsUrl = 'https://assetit.pilargroup.id/saml/acs';
+            $acsUrl = 'http://assetit.pilargroup.id/saml/acs';
         }
 
         // Simpan ke DB
