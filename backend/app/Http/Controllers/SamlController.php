@@ -18,7 +18,7 @@ class SamlController extends Controller
             'debug'  => env('APP_DEBUG', false),
 
             'idp' => [
-                'entityId' => 'https://pilargroup.id/saml/metadata',
+                'entityId' => 'http://pilargroup.id/saml/metadata',
                 'singleSignOnService' => [
                     'url'     => 'https://pilargroup.id/saml/sso',
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
