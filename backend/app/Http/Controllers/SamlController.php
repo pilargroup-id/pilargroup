@@ -31,13 +31,13 @@ class SamlController extends Controller
             ],
 
             'sp' => [
-                'entityId' => env('APP_SAML_SP_ENTITY_ID', 'http://assetit.pilargroup.id'),
+                'entityId' => env('APP_SAML_SP_ENTITY_ID', 'https://assetit.pilargroup.id'),
                 'assertionConsumerService' => [
-                    'url'     => env('APP_SAML_ACS_URL', 'http://assetit.pilargroup.id/saml/acs'),
+                    'url'     => env('APP_SAML_ACS_URL', 'https://assetit.pilargroup.id/saml/acs'),
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
                 ],
                 'singleLogoutService' => [
-                    'url'     => env('APP_SAML_SLO_URL', 'http://assetit.pilargroup.id/saml/slo'),
+                    'url'     => env('APP_SAML_SLO_URL', 'https://assetit.pilargroup.id/saml/slo'),
                     'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                 ],
                 'NameIDFormat' => 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
@@ -115,7 +115,7 @@ class SamlController extends Controller
 
         // Fallback ACS URL
         if (empty($acsUrl)) {
-            $acsUrl = 'http://assetit.pilargroup.id/saml/acs';
+            $acsUrl = env('APP_SAML_ACS_URL', 'https://assetit.pilargroup.id/saml/acs');
         }
 
         // Simpan ke DB
@@ -162,7 +162,7 @@ class SamlController extends Controller
         $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
         $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));
 
-        $acsUrl = 'http://assetit.pilargroup.id/saml/acs';
+        $acsUrl = env('APP_SAML_ACS_URL', 'https://assetit.pilargroup.id/saml/acs');
         $relayState = $pending->relay_state ?? '';
 
         // Build SAML Response XML
@@ -171,6 +171,7 @@ class SamlController extends Controller
         $responseId   = '_' . bin2hex(random_bytes(16));
         $assertionId  = '_' . bin2hex(random_bytes(16));
         $issuer       = $this->getSamlSettings()['idp']['entityId'];
+        $spEntityId   = env('APP_SAML_SP_ENTITY_ID', 'https://assetit.pilargroup.id');
 
     $assertionXml = <<<XML
     <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
@@ -184,7 +185,7 @@ class SamlController extends Controller
         </saml:Subject>
         <saml:Conditions NotBefore="{$now}" NotOnOrAfter="{$notOnOrAfter}">
             <saml:AudienceRestriction>
-                <saml:Audience>http://assetit.pilargroup.id</saml:Audience>
+                <saml:Audience>{$spEntityId}</saml:Audience>
             </saml:AudienceRestriction>
         </saml:Conditions>
         <saml:AuthnStatement AuthnInstant="{$now}" SessionIndex="{$assertionId}">
