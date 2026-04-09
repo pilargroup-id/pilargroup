@@ -160,8 +160,12 @@ class SamlController extends Controller
 
         DB::table('saml_pending_requests')->where('id', $samlToken)->delete();
 
-        // Sync user ke Snipe-IT dulu sebelum kirim SAML response
-        (new \App\Services\SnipeItService())->syncUser($user);
+        // Cek apakah user ada di Snipe-IT — kalau tidak ada, tolak dan redirect dashboard
+        $snipeUser = (new \App\Services\SnipeItService())->findUser($user->username);
+        if (!$snipeUser) {
+            \Log::warning("SAML blocked: user {$user->username} not found in Snipe-IT");
+            return redirect('https://pilargroup.id/dashboard');
+        }
 
         $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
         $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));

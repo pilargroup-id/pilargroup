@@ -16,6 +16,22 @@ class SnipeItService
         $this->token   = env('SNIPEIT_API_TOKEN', '');
     }
 
+    public function findUser(string $username): ?array
+    {
+        if (empty($this->token)) return null;
+
+        $response = Http::withToken($this->token)
+            ->get("{$this->baseUrl}/api/v1/users", [
+                'search' => $username,
+                'limit'  => 1,
+            ]);
+
+        if (!$response->successful()) return null;
+
+        $rows = $response->json('rows') ?? [];
+        return collect($rows)->firstWhere('username', $username);
+    }
+
     public function syncUser(object $user): void
     {
         if (empty($this->token)) {
@@ -35,24 +51,10 @@ class SnipeItService
             'activated'  => true,
         ];
 
-        // Cek apakah user sudah ada di Snipe-IT
-        $existing = Http::withToken($this->token)
-            ->get("{$this->baseUrl}/api/v1/users", [
-                'search' => $user->username,
-                'limit'  => 1,
-            ]);
-
-        if (!$existing->successful()) {
-            Log::error("SnipeIt sync: failed to search user {$user->username}: " . $existing->body());
-            return;
-        }
-
-        $rows = $existing->json('rows') ?? [];
-        $match = collect($rows)->firstWhere('username', $user->username);
+        $match = $this->findUser($user->username);
 
         if ($match) {
-            // User sudah ada → update
-            $snipeId = $match['id'];
+            $snipeId  = $match['id'];
             $response = Http::withToken($this->token)
                 ->patch("{$this->baseUrl}/api/v1/users/{$snipeId}", $payload);
 
@@ -62,8 +64,7 @@ class SnipeItService
                 Log::error("SnipeIt sync update failed for {$user->username}: " . $response->body());
             }
         } else {
-            // User belum ada → create
-            $password = bin2hex(random_bytes(16));
+            $password            = bin2hex(random_bytes(16));
             $payload['password'] = $password;
             $payload['password_confirmation'] = $password;
 
