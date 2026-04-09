@@ -138,107 +138,109 @@ class SamlController extends Controller
     }
 
     // Dipanggil dari /api/saml/respond (setelah user login)
-public function sendResponse(string $userId, string $samlToken)
-{
-    $pending = DB::table('saml_pending_requests')
-        ->where('id', $samlToken)
-        ->first();
+    public function sendResponse(string $userId, string $samlToken)
+    {
+        $pending = DB::table('saml_pending_requests')
+            ->where('id', $samlToken)
+            ->first();
 
-    if (!$pending) {
-        abort(400, 'Invalid or expired SAML token');
+        if (!$pending) {
+            abort(400, 'Invalid or expired SAML token');
+        }
+
+        $user = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $userId)
+            ->where('is_active', 1)
+            ->first();
+
+        if (!$user) {
+            abort(403, 'User not found or inactive');
+        }
+
+        DB::table('saml_pending_requests')->where('id', $samlToken)->delete();
+
+        // Sync user ke Snipe-IT dulu sebelum kirim SAML response
+        (new \App\Services\SnipeItService())->syncUser($user);
+
+        $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
+        $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));
+
+        $acsUrl     = $pending->acs_url;
+        $relayState = $pending->relay_state ?? '';
+
+        $now          = gmdate('Y-m-d\TH:i:s\Z');
+        $notOnOrAfter = gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 hour'));
+        $responseId   = '_' . bin2hex(random_bytes(16));
+        $assertionId  = '_' . bin2hex(random_bytes(16));
+        $issuer       = $this->getSamlSettings()['idp']['entityId'];
+        $spEntityId   = env('APP_SAML_SP_ENTITY_ID', 'https://assetit.pilargroup.id');
+
+        $nameParts = explode(' ', trim($user->name));
+        $firstName = $nameParts[0];
+        $lastName  = implode(' ', array_slice($nameParts, 1)) ?: $nameParts[0];
+
+        $assertionXml = <<<XML
+    <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+        ID="{$assertionId}" Version="2.0" IssueInstant="{$now}">
+        <saml:Issuer>{$issuer}</saml:Issuer>
+        <saml:Subject>
+            <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">{$user->username}</saml:NameID>
+            <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+                <saml:SubjectConfirmationData NotOnOrAfter="{$notOnOrAfter}" Recipient="{$acsUrl}"/>
+            </saml:SubjectConfirmation>
+        </saml:Subject>
+        <saml:Conditions NotBefore="{$now}" NotOnOrAfter="{$notOnOrAfter}">
+            <saml:AudienceRestriction>
+                <saml:Audience>{$spEntityId}</saml:Audience>
+            </saml:AudienceRestriction>
+        </saml:Conditions>
+        <saml:AuthnStatement AuthnInstant="{$now}" SessionIndex="{$assertionId}">
+            <saml:AuthnContext>
+                <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef>
+            </saml:AuthnContext>
+        </saml:AuthnStatement>
+        <saml:AttributeStatement>
+            <saml:Attribute Name="username">
+                <saml:AttributeValue>{$user->username}</saml:AttributeValue>
+            </saml:Attribute>
+            <saml:Attribute Name="email">
+                <saml:AttributeValue>{$user->email}</saml:AttributeValue>
+            </saml:Attribute>
+            <saml:Attribute Name="first_name">
+                <saml:AttributeValue>{$firstName}</saml:AttributeValue>
+            </saml:Attribute>
+            <saml:Attribute Name="last_name">
+                <saml:AttributeValue>{$lastName}</saml:AttributeValue>
+            </saml:Attribute>
+        </saml:AttributeStatement>
+    </saml:Assertion>
+    XML;
+
+        $signedAssertion = $this->signXml($assertionXml, $keyContent, $certContent);
+
+        $samlResponse = <<<XML
+    <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+        ID="{$responseId}" Version="2.0" IssueInstant="{$now}"
+        Destination="{$acsUrl}">
+        <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{$issuer}</saml:Issuer>
+        <samlp:Status>
+            <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+        </samlp:Status>
+        {$signedAssertion}
+    </samlp:Response>
+    XML;
+
+        \Log::info('ACS URL used: ' . $acsUrl);
+
+        $encodedResponse = base64_encode($samlResponse);
+
+        return view('saml.response', [
+            'acs_url'       => $acsUrl,
+            'saml_response' => $encodedResponse,
+            'relay_state'   => $relayState,
+        ]);
     }
-
-    $user = DB::connection('pilargroup')
-        ->table('central_users')
-        ->where('id', $userId)
-        ->where('is_active', 1)
-        ->first();
-
-    if (!$user) {
-        abort(403, 'User not found or inactive');
-    }
-
-    DB::table('saml_pending_requests')->where('id', $samlToken)->delete();
-
-    $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
-    $keyContent  = file_get_contents(storage_path('app/saml/saml.key'));
-
-    $acsUrl     = $pending->acs_url;
-    $relayState = $pending->relay_state ?? '';
-
-    $now          = gmdate('Y-m-d\TH:i:s\Z');
-    $notOnOrAfter = gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 hour'));
-    $responseId   = '_' . bin2hex(random_bytes(16));
-    $assertionId  = '_' . bin2hex(random_bytes(16));
-    $issuer       = $this->getSamlSettings()['idp']['entityId'];
-    $spEntityId   = env('APP_SAML_SP_ENTITY_ID', 'https://assetit.pilargroup.id');
-
-    // Split name jadi first_name dan last_name
-    $nameParts = explode(' ', trim($user->name));
-    $firstName = $nameParts[0];
-    $lastName  = implode(' ', array_slice($nameParts, 1)) ?: $nameParts[0];
-
-    $assertionXml = <<<XML
-<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-    ID="{$assertionId}" Version="2.0" IssueInstant="{$now}">
-    <saml:Issuer>{$issuer}</saml:Issuer>
-    <saml:Subject>
-        <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">{$user->username}</saml:NameID>
-        <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-            <saml:SubjectConfirmationData NotOnOrAfter="{$notOnOrAfter}" Recipient="{$acsUrl}"/>
-        </saml:SubjectConfirmation>
-    </saml:Subject>
-    <saml:Conditions NotBefore="{$now}" NotOnOrAfter="{$notOnOrAfter}">
-        <saml:AudienceRestriction>
-            <saml:Audience>{$spEntityId}</saml:Audience>
-        </saml:AudienceRestriction>
-    </saml:Conditions>
-    <saml:AuthnStatement AuthnInstant="{$now}" SessionIndex="{$assertionId}">
-        <saml:AuthnContext>
-            <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef>
-        </saml:AuthnContext>
-    </saml:AuthnStatement>
-    <saml:AttributeStatement>
-        <saml:Attribute Name="username">
-            <saml:AttributeValue>{$user->username}</saml:AttributeValue>
-        </saml:Attribute>
-        <saml:Attribute Name="email">
-            <saml:AttributeValue>{$user->email}</saml:AttributeValue>
-        </saml:Attribute>
-        <saml:Attribute Name="first_name">
-            <saml:AttributeValue>{$firstName}</saml:AttributeValue>
-        </saml:Attribute>
-        <saml:Attribute Name="last_name">
-            <saml:AttributeValue>{$lastName}</saml:AttributeValue>
-        </saml:Attribute>
-    </saml:AttributeStatement>
-</saml:Assertion>
-XML;
-
-    $signedAssertion = $this->signXml($assertionXml, $keyContent, $certContent);
-
-    $samlResponse = <<<XML
-<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-    ID="{$responseId}" Version="2.0" IssueInstant="{$now}"
-    Destination="{$acsUrl}">
-    <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{$issuer}</saml:Issuer>
-    <samlp:Status>
-        <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-    </samlp:Status>
-    {$signedAssertion}
-</samlp:Response>
-XML;
-
-    \Log::info('ACS URL used: ' . $acsUrl);
-
-    $encodedResponse = base64_encode($samlResponse);
-
-    return view('saml.response', [
-        'acs_url'       => $acsUrl,
-        'saml_response' => $encodedResponse,
-        'relay_state'   => $relayState,
-    ]);
-}
 
     // Sign XML dengan private key (XMLDSig)
     private function signXml(string $xml, string $privateKeyPem, string $certPem): string
