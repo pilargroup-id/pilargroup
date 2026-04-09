@@ -164,7 +164,13 @@ class SamlController extends Controller
         $snipeUser = (new \App\Services\SnipeItService())->findUser($user->username);
         if (!$snipeUser) {
             \Log::warning("SAML blocked: user {$user->username} not found in Snipe-IT");
-            return redirect('https://pilargroup.id/dashboard');
+            return response('
+                <html>
+                    <body>
+                        <script>window.location.href = "https://pilargroup.id/dashboard";</script>
+                    </body>
+                </html>
+            ');
         }
 
         $certContent = file_get_contents(storage_path('app/saml/saml.crt'));
