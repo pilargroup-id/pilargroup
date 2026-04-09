@@ -36,9 +36,27 @@ async function handleSamlIfNeeded() {
       body: JSON.stringify({ saml_token: samlToken }),
     })
 
-    if (!res.ok) return false
+    // Token expired/tidak ada → redirect dashboard
+    if (res.status === 400) {
+      window.location.href = 'https://pilargroup.id/dashboard'
+      return true
+    }
+
+    // User tidak ada di Snipe-IT → backend return HTML redirect
+    // Browser akan ikuti redirect dari JS di dalam HTML response
+    if (!res.ok) {
+      window.location.href = 'https://pilargroup.id/dashboard'
+      return true
+    }
 
     const html = await res.text()
+
+    // Cek apakah response adalah redirect HTML (bukan SAML form)
+    if (!html.includes('SAMLResponse')) {
+      window.location.href = 'https://pilargroup.id/dashboard'
+      return true
+    }
+
     const parsed = new DOMParser().parseFromString(html, 'text/html')
 
     const form = document.createElement('form')
