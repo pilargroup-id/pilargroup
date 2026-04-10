@@ -147,6 +147,14 @@ class UserManagementController extends Controller
     // PUT /api/users/{id} → update user
     public function update(Request $request, $id)
     {
+        // Normalize empty strings to null for nullable fields
+        $nullableFields = ['username', 'password', 'name', 'email', 'phone', 'job_position', 'job_level'];
+        foreach ($nullableFields as $field) {
+            if ($request->has($field) && $request->input($field) === '') {
+                $request->merge([$field => null]);
+            }
+        }
+
         $request->validate([
             'username'      => 'nullable|string|min:3',
             'password'      => 'nullable|string|min:6',
@@ -174,7 +182,7 @@ class UserManagementController extends Controller
         $now = now()->toDateTimeString();
         $updates = ['updated_at' => $now];
 
-        if ($request->input('username')) {
+        if ($request->has('username') && !is_null($request->input('username'))) {
             $exists = DB::connection('pilargroup')
                 ->table('central_users')
                 ->where('username', $request->input('username'))
@@ -187,14 +195,26 @@ class UserManagementController extends Controller
             $updates['username'] = $request->input('username');
         }
 
-        if ($request->input('password'))     $updates['password']       = Hash::make($request->input('password'));
-        if ($request->input('name'))         $updates['name']           = $request->input('name');
-        if ($request->input('email') !== null) $updates['email']        = $request->input('email');
-        if ($request->input('phone') !== null) $updates['phone']        = $request->input('phone');
-        if ($request->input('department_id')) $updates['department_id'] = $request->input('department_id');
-        if ($request->input('job_position')) $updates['job_position']   = $request->input('job_position');
-        if ($request->input('job_level'))    $updates['job_level']      = $request->input('job_level');
-        if (!is_null($request->input('is_active'))) $updates['is_active'] = $request->input('is_active');
+        if ($request->has('password') && !is_null($request->input('password'))) {
+            $updates['password'] = Hash::make($request->input('password'));
+        }
+
+        if ($request->has('name') && !is_null($request->input('name'))) {
+            $updates['name'] = $request->input('name');
+        }
+
+        if ($request->has('email'))        $updates['email']        = $request->input('email'); // bisa null
+        if ($request->has('phone'))        $updates['phone']        = $request->input('phone'); // bisa null
+        if ($request->has('job_position')) $updates['job_position'] = $request->input('job_position'); // bisa null
+        if ($request->has('job_level'))    $updates['job_level']    = $request->input('job_level');    // bisa null
+
+        if ($request->has('department_id') && !is_null($request->input('department_id'))) {
+            $updates['department_id'] = $request->input('department_id');
+        }
+
+        if (!is_null($request->input('is_active'))) {
+            $updates['is_active'] = $request->input('is_active');
+        }
 
         if (array_key_exists('internal_id', $request->all())) {
             $internalId = $request->input('internal_id');
