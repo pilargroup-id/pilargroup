@@ -22,11 +22,15 @@ class SnipeItService
 
         $response = Http::withToken($this->token)
             ->get("{$this->baseUrl}/api/v1/users", [
-                'search' => $username,
-                'limit'  => 1,
+                'search'       => $username,
+                'search_field' => 'username',
+                'limit'        => 10,
             ]);
 
-        if (!$response->successful()) return null;
+        if (!$response->successful()) {
+            Log::error("SnipeIt findUser failed for {$username}: " . $response->body());
+            return null;
+        }
 
         $rows = $response->json('rows') ?? [];
         return collect($rows)->firstWhere('username', $username);
