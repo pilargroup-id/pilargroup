@@ -72,29 +72,15 @@ function buildUpdateUserPayload(formValues) {
     payload.name = name
   }
 
-  const email = formValues.email.trim()
-  if (email) {
-    payload.email = email
-  }
-
-  const phone = normalizePhoneNumber(formValues.phone)
-  if (phone) {
-    payload.phone = phone
-  }
+  // ✅ Selalu include, meski kosong → kirim null biar backend bisa null-kan
+  payload.email = formValues.email.trim() || null
+  payload.phone = normalizePhoneNumber(formValues.phone) || null
+  payload.job_position = formValues.job_position.trim() || null
+  payload.job_level = formValues.job_level.trim() || null
 
   const departmentId = Number(formValues.department_id)
   if (Number.isInteger(departmentId) && departmentId > 0) {
     payload.department_id = departmentId
-  }
-
-  const jobPosition = formValues.job_position.trim()
-  if (jobPosition) {
-    payload.job_position = jobPosition
-  }
-
-  const jobLevel = formValues.job_level.trim()
-  if (jobLevel) {
-    payload.job_level = jobLevel
   }
 
   const internalIdValue = formValues.internal_id.trim()
@@ -102,7 +88,6 @@ function buildUpdateUserPayload(formValues) {
     payload.internal_id = null
   } else {
     const internalId = Number(internalIdValue)
-
     if (Number.isInteger(internalId) && internalId > 0) {
       payload.internal_id = internalId
     }

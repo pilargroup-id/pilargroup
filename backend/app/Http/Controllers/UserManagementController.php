@@ -155,6 +155,13 @@ class UserManagementController extends Controller
             }
         }
 
+        \Log::info('UPDATE USER REQUEST', [
+            'has_email' => $request->has('email'),
+            'email_val' => $request->input('email'),
+            'has_phone' => $request->has('phone'),
+            'phone_val' => $request->input('phone'),
+        ]);
+
         $request->validate([
             'username'      => 'nullable|string|min:3',
             'password'      => 'nullable|string|min:6',
