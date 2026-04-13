@@ -310,7 +310,8 @@ class SamlController extends Controller
     // GET /saml/slo
     public function slo()
     {
+        \Log::info('SLO hit: ' . request()->fullUrl());
         session()->forget(['saml_request', 'saml_relay_state', 'saml_acs_url']);
-        return redirect('/login');
+        return redirect('https://pilargroup.id/login');
     }
 }
