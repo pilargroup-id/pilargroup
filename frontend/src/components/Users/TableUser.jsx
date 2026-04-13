@@ -26,6 +26,17 @@ function getDetailValue(value) {
   return value
 }`  `
 
+function formatAppsForTable(apps) {
+  if (!Array.isArray(apps) || apps.length === 0) {
+    return '-'
+  }
+
+  return apps
+    .map((app) => String(app).trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
 function renderDetailValue(value) {
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -64,11 +75,6 @@ function renderDetailValue(value) {
 
 function getDetailSections(user) {
   const rawUser = user.raw ?? {}
-  const userApps = Array.isArray(user.apps)
-    ? user.apps
-    : Array.isArray(rawUser.apps)
-      ? rawUser.apps
-      : []
 
   return [
     {
@@ -106,16 +112,20 @@ function getDetailSections(user) {
       ],
     },
     {
-      title: 'Activity & Apps',
+      title: 'Activity',
       wide: true,
       fields: [
         { label: 'created_at', value: getDetailValue(rawUser.created_at ?? rawUser.createdAt) },
         { label: 'updated_at', value: getDetailValue(rawUser.updated_at ?? rawUser.updatedAt) },
         {
-          label: 'apps',
-          value: getDetailValue(userApps),
-          kind: 'chips',
-          wide: true,
+          label: 'last_active',
+          value: getDetailValue(
+            rawUser.last_active ??
+              rawUser.lastActive ??
+              rawUser.last_login_at ??
+              rawUser.lastLoginAt ??
+              user.lastActive,
+          ),
         },
       ],
     },
@@ -176,10 +186,9 @@ function TableUser({
           <thead>
             <tr>
               <th scope="col">User</th>
-              <th scope="col">Email</th>
-              <th scope="col">Division</th>
+              <th scope="col">Departement</th>
               <th scope="col">Role</th>
-              <th scope="col">Last Active</th>
+              <th scope="col">Apps</th>
               <th scope="col" className="users-table__detail-header">
                 Detail
               </th>
@@ -192,6 +201,8 @@ function TableUser({
                 const isExpanded = expandedUserId === user.userId
                 const accordionId = `users-table-accordion-${user.userId}`
                 const detailSections = getDetailSections(user)
+                const userStatusKey = user.statusKey ?? 'inactive'
+                const userStatusLabel = user.status ?? '-'
 
                 return (
                   <Fragment key={user.userId}>
@@ -208,30 +219,21 @@ function TableUser({
                           <span className="users-table__avatar">{getInitials(user.name)}</span>
 
                           <div className="users-table__identity-copy">
-                            <strong className="users-table__name">{user.name}</strong>
+                            <div className="users-table__name-row">
+                              <strong className="users-table__name">{user.name}</strong>
+                              <span
+                                className={`users-table__status users-table__status--inline users-table__status--${userStatusKey}`}
+                              >
+                                {userStatusLabel}
+                              </span>
+                            </div>
                             <p className="users-table__meta">{user.id}</p>
                           </div>
                         </div>
                       </td>
-                      <td>
-                        {user.email !== '-' ? (
-                          <a
-                            href={`mailto:${user.email}`}
-                            className="users-table__link"
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                            }}
-                          >
-                            {user.email}
-                          </a>
-                        ) : (
-                          user.email
-                        )}
-                      </td>
                       <td>{user.division}</td>
                       <td>{user.role}</td>
-                      <td>{user.lastActive}</td>
+                      <td>{formatAppsForTable(user.apps)}</td>
                       <td className="users-table__detail-cell">
                         <button
                           type="button"
@@ -258,19 +260,13 @@ function TableUser({
 
                     {isExpanded ? (
                       <tr className="users-table__accordion-row">
-                        <td colSpan="6">
+                        <td colSpan="5">
                           <div className="users-table__accordion" id={accordionId}>
                             <div className="users-table__accordion-header">
                               <div className="users-table__accordion-copy">
                                 <p className="users-table__accordion-eyebrow">User detail</p>
                                 <h3 className="users-table__accordion-title">{user.name}</h3>
                               </div>
-
-                              <span
-                                className={`users-table__status users-table__status--${user.statusKey}`}
-                              >
-                                {user.status}
-                              </span>
                             </div>
 
                             <div className="users-table__detail-shell">
@@ -336,7 +332,7 @@ function TableUser({
               })
             ) : (
               <tr>
-                <td colSpan="6">
+                <td colSpan="5">
                   <div className="users-table__empty">{tableMessage}</div>
                 </td>
               </tr>

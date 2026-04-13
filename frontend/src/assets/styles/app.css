@@ -1545,6 +1545,14 @@
   font-size: 0.98rem;
 }
 
+.users-table__name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .users-table__meta {
   margin: 0.2rem 0 0;
   color: var(--neutral-gray);
@@ -1623,6 +1631,13 @@
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.users-table__status--inline {
+  min-width: auto;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
 }
 
 .users-table__status--active {
