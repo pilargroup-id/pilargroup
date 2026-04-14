@@ -18,6 +18,7 @@ class SSOController extends Controller
      */
     public function authorize(Request $request)
     {
+        Log::info('SSO authorize hit', $request->all());
         $request->validate([
             'client_id'    => 'required|string',
             'redirect_uri' => 'required|url',
