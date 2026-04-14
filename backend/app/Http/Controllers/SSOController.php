@@ -26,7 +26,7 @@ class SSOController extends Controller
 
         $client = SsoClient::whereHas('project', function ($q) use ($request) {
             $q->where('slug', $request->client_id)
-              ->where('is_active', 1);
+            ->where('is_active', 1);
         })->first();
 
         if (!$client) {
@@ -37,8 +37,19 @@ class SSOController extends Controller
             abort(403, 'Redirect URI tidak valid.');
         }
 
-        // Encode SSO context ke JWT short-lived (10 menit)
-        $ssoToken = JWT::encode([
+        $claims = [
+            'client_id'    => $request->client_id,
+            'redirect_uri' => $request->redirect_uri,
+            'state'        => $request->state,
+        ];
+
+        // Sudah login di pilargroup → langsung issue handoff token
+        if (auth()->check()) {
+            return $this->issueAndRedirect(auth()->user(), $claims);
+        }
+
+        // Belum login → encode context ke sso_token, redirect ke login page
+        $ssoToken = \Firebase\JWT\JWT::encode([
             'iss'          => config('app.url'),
             'purpose'      => 'sso_context',
             'client_id'    => $request->client_id,

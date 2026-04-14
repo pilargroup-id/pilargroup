@@ -99,10 +99,28 @@ export function getProjectLaunchUrl(project) {
     throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
   }
 
-  const launchUrl = buildProjectUrl(project.urlRaw)
+  // Project yang pakai SSO flow (punya sso_client)
+  const SSO_PROJECTS = ['ticket'] // tambah slug lain di sini kalau nanti ada
 
-  launchUrl.searchParams.set('token', token)
-  launchUrl.searchParams.set('source', 'dashboard-it')
+  if (SSO_PROJECTS.includes(project.slug)) {
+    const projectOrigin = new URL(project.urlRaw).origin
+    const redirectUri   = `${projectOrigin}/api/auth/callback`
+
+    const state = crypto.randomUUID()
+    sessionStorage.setItem('sso_state', state)
+
+    const ssoUrl = new URL('/sso/authorize', window.location.origin)
+    ssoUrl.searchParams.set('client_id',    project.slug)
+    ssoUrl.searchParams.set('redirect_uri', redirectUri)
+    ssoUrl.searchParams.set('state',        state)
+
+    return ssoUrl.toString()
+  }
+
+  // Flow lama — project yang terima JWT langsung (treeview, touchpoint, dll)
+  const launchUrl = buildProjectUrl(project.urlRaw)
+  launchUrl.searchParams.set('token',   token)
+  launchUrl.searchParams.set('source',  'dashboard-it')
 
   if (project.slug && project.slug !== 'no-slug') {
     launchUrl.searchParams.set('project', project.slug)
