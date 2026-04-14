@@ -18,12 +18,18 @@ class SSOController extends Controller
      */
     public function authorize(Request $request)
     {
-        Log::info('SSO authorize hit', $request->all());
-        $request->validate([
-            'client_id'    => 'required|string',
-            'redirect_uri' => 'required|url',
-            'state'        => 'required|string',
+
+        Log::info('SSO authorize hit', [
+            'auth_check' => auth()->check(),
+            'user_id'    => auth()->id(),
+            'all'        => $request->all(),
         ]);
+        // Log::info('SSO authorize hit', $request->all());
+        // $request->validate([
+        //     'client_id'    => 'required|string',
+        //     'redirect_uri' => 'required|url',
+        //     'state'        => 'required|string',
+        // ]);
 
         $client = SsoClient::whereHas('project', function ($q) use ($request) {
             $q->where('slug', $request->client_id)
