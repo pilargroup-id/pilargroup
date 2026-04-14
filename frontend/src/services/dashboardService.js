@@ -103,19 +103,17 @@ export function getProjectLaunchUrl(project) {
   const SSO_PROJECTS = ['ticket'] // tambah slug lain di sini kalau nanti ada
 
   if (SSO_PROJECTS.includes(project.slug)) {
-    const projectOrigin = new URL(project.urlRaw).origin
-    const redirectUri   = `${projectOrigin}/api/auth/callback`
+      const projectOrigin = new URL(project.urlRaw).origin
+      const redirectUri   = `${projectOrigin}/api/auth/callback`
+      const state         = crypto.randomUUID()
+      sessionStorage.setItem('sso_state', state)
 
-    const state = crypto.randomUUID()
-    sessionStorage.setItem('sso_state', state)
+      const ssoUrl = new URL('/api/sso/authorize', window.location.origin)
+      ssoUrl.searchParams.set('client_id',    project.slug)
+      ssoUrl.searchParams.set('redirect_uri', redirectUri)
+      ssoUrl.searchParams.set('state',        state)
 
-    const ssoUrl = new URL('/sso/authorize', window.location.origin)
-    ssoUrl.searchParams.set('client_id',    project.slug)
-    ssoUrl.searchParams.set('redirect_uri', redirectUri)
-    ssoUrl.searchParams.set('state',        state)
-    console.log('SSO URL:', ssoUrl.toString())
-
-    return ssoUrl.toString()
+      return ssoUrl.toString()
   }
 
   // Flow lama — project yang terima JWT langsung (treeview, touchpoint, dll)

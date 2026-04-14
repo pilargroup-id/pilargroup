@@ -64,4 +64,8 @@ Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
             ->sendResponse($userId, $request->saml_token);
     });
 
+Route::get('/sso/authorize', [SSOController::class, 'authorize'])
+    ->middleware('auth.central')
+    ->name('sso.authorize');
+
 Route::post('/sso/verify', [SSOController::class, 'verify']);

@@ -18,18 +18,11 @@ class SSOController extends Controller
      */
     public function authorize(Request $request)
     {
-
-        Log::info('SSO authorize hit', [
-            'auth_check' => auth()->check(),
-            'user_id'    => auth()->id(),
-            'all'        => $request->all(),
+        $request->validate([
+            'client_id'    => 'required|string',
+            'redirect_uri' => 'required|url',
+            'state'        => 'required|string',
         ]);
-        // Log::info('SSO authorize hit', $request->all());
-        // $request->validate([
-        //     'client_id'    => 'required|string',
-        //     'redirect_uri' => 'required|url',
-        //     'state'        => 'required|string',
-        // ]);
 
         $client = SsoClient::whereHas('project', function ($q) use ($request) {
             $q->where('slug', $request->client_id)
@@ -44,28 +37,16 @@ class SSOController extends Controller
             abort(403, 'Redirect URI tidak valid.');
         }
 
+        // User sudah login — auth()->user() tersedia karena middleware auth.central
+        $user = auth()->user();
+
         $claims = [
             'client_id'    => $request->client_id,
             'redirect_uri' => $request->redirect_uri,
             'state'        => $request->state,
         ];
 
-        // Sudah login di pilargroup → langsung issue handoff token
-        if (auth()->check()) {
-            return $this->issueAndRedirect(auth()->user(), $claims);
-        }
-
-        // Belum login → encode context ke sso_token, redirect ke login page
-        $ssoToken = \Firebase\JWT\JWT::encode([
-            'iss'          => config('app.url'),
-            'purpose'      => 'sso_context',
-            'client_id'    => $request->client_id,
-            'redirect_uri' => $request->redirect_uri,
-            'state'        => $request->state,
-            'exp'          => now()->addMinutes(10)->timestamp,
-        ], config('jwt.secret'), 'HS256');
-
-        return redirect(config('app.frontend_url') . '/login?sso_token=' . $ssoToken);
+        return $this->issueAndRedirect($user, $claims);
     }
 
     /**

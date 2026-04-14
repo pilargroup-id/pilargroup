@@ -13,5 +13,3 @@ Route::get('/saml/sso', [SamlController::class, 'sso']);
 Route::post('/saml/sso', [SamlController::class, 'sso']);
 Route::get('/saml/slo', [SamlController::class, 'slo']);
 Route::post('/saml/slo', [SamlController::class, 'slo']);
-
-Route::get('/sso/authorize', [SSOController::class, 'authorize'])->name('sso.authorize');
