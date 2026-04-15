@@ -1,16 +1,26 @@
-public function projects()
-{
-    return $this->hasManyThrough(
-        MasterProject::class,
-        CentralUserProject::class,
-        'user_id',
-        'id',
-        'id',
-        'project_id'
-    );
-}
+<?php
 
-public function hasProjectAccess(string $slug): bool
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class CentralUserProject extends Model
 {
-    return $this->projects()->where('slug', $slug)->exists();
+    protected $connection = 'pilargroup';
+    protected $table      = 'central_user_projects';
+    protected $primaryKey = 'id';
+    public $incrementing  = false;
+    protected $keyType    = 'string';
+
+    protected $fillable = ['id', 'user_id', 'project_id'];
+
+    public function user()
+    {
+        return $this->belongsTo(CentralUser::class, 'user_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(MasterProject::class, 'project_id');
+    }
 }
