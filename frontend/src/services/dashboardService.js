@@ -80,7 +80,7 @@ function getProjectDisabledReason(project, hasAccess = true) {
   return ''
 }
 
-export function getProjectLaunchUrl(project) {
+export async function getProjectLaunchUrl(project) {
   if (!canAccessProject(project)) {
     throw new ApiError('Anda tidak memiliki akses ke project ini.')
   }
@@ -102,19 +102,44 @@ export function getProjectLaunchUrl(project) {
   // Project yang pakai SSO flow (punya sso_client)
   const SSO_PROJECTS = ['ticket'] // tambah slug lain di sini kalau nanti ada
 
-  if (SSO_PROJECTS.includes(project.slug)) {
-      const projectOrigin = new URL(project.urlRaw).origin
-      const redirectUri   = `${projectOrigin}/api/auth/callback`
-      const state         = crypto.randomUUID()
-      sessionStorage.setItem('sso_state', state)
+if (SSO_PROJECTS.includes(project.slug)) {
+    const projectOrigin = new URL(project.urlRaw).origin
 
-      const ssoUrl = new URL('/api/sso/authorize', window.location.origin)
-      ssoUrl.searchParams.set('client_id',    project.slug)
-      ssoUrl.searchParams.set('redirect_uri', redirectUri)
-      ssoUrl.searchParams.set('state',        state)
+    // Hit ticket API untuk generate state
+    const ssoUrlRes = await fetch(`${projectOrigin}/api/auth/sso-url`)
+    if (!ssoUrlRes.ok) throw new ApiError('Gagal generate SSO URL.')
 
-      return ssoUrl.toString()
-  }
+    const { url } = await ssoUrlRes.json()
+
+    // url sudah berisi full /sso/authorize URL dari ticket
+    // Tapi kita perlu hit pilargroup /api/sso/authorize dengan token
+    // Jadi kita parse state dari url yang dikembalikan ticket
+    const ticketUrl    = new URL(url)
+    const state        = ticketUrl.searchParams.get('state')
+    const redirectUri  = ticketUrl.searchParams.get('redirect_uri')
+
+    const params = new URLSearchParams({
+        client_id:    project.slug,
+        redirect_uri: redirectUri,
+        state,
+    })
+
+    const res = await fetch(`/api/sso/authorize?${params}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept':        'application/json',
+        },
+    })
+
+    if (!res.ok) {
+        const data = await res.json()
+        throw new ApiError(data.message || 'SSO gagal.')
+    }
+
+    const data = await res.json()
+    window.location.assign(data.redirect_url)
+    return
+}
 
   // Flow lama — project yang terima JWT langsung (treeview, touchpoint, dll)
   const launchUrl = buildProjectUrl(project.urlRaw)
