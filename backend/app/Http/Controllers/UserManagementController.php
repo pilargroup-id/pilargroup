@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Services\SnipeItService;
+use App\Services\TicketService;
 
 class UserManagementController extends Controller
 {
