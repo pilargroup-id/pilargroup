@@ -126,11 +126,30 @@ class UserManagementController extends Controller
             }
 
             $newUser = (object) [
-                'username' => $request->input('username'),
-                'name'     => $request->input('name'),
-                'email'    => $request->input('email'),
+                'username'     => $request->input('username'),
+                'name'         => $request->input('name'),
+                'email'        => $request->input('email'),
+                'phone'        => $request->input('phone'),
+                'job_position' => $request->input('job_position'),
             ];
+
+            // Ambil nama department untuk sync
+            $department = null;
+            if ($request->input('department_id')) {
+                $dept = DB::connection('pilargroup')
+                    ->table('master_departments')
+                    ->where('id', $request->input('department_id'))
+                    ->value('name');
+                $department = $dept ?? null;
+            }
+
+            // Sync ke SnipeIt (sudah ada)
             (new SnipeItService())->syncUser($newUser);
+
+            // Sync ke ticket hanya kalau user punya akses ticket
+            if (in_array('ticket', $request->input('apps', []))) {
+                (new \App\Services\TicketService())->syncUser($newUser, $department);
+            }
 
             return response()->json([
                 'message' => 'User registered successfully',
@@ -246,12 +265,38 @@ class UserManagementController extends Controller
             ->where('id', $id)
             ->update($updates);
 
+        // Ambil data user terbaru setelah update
+        $updatedUser = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $id)
+            ->first();
+
+        // Sync ke SnipeIt (sudah ada, kondisinya kita relax jadi selalu sync kalau ada perubahan)
         if (isset($updates['username']) || isset($updates['name']) || isset($updates['email'])) {
-            $updatedUser = DB::connection('pilargroup')
-                ->table('central_users')
-                ->where('id', $id)
-                ->first();
             (new SnipeItService())->syncUser($updatedUser);
+        }
+
+        // Cek apakah user punya akses ticket (dari apps yang dikirim, atau dari DB kalau apps tidak dikirim)
+        $userApps = $request->has('apps')
+            ? $request->input('apps', [])
+            : DB::connection('pilargroup')
+                ->table('central_user_projects as cup')
+                ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+                ->where('cup.user_id', $id)
+                ->pluck('mp.slug')
+                ->toArray();
+
+        if (in_array('ticket', $userApps)) {
+            // Ambil nama department
+            $department = null;
+            if ($updatedUser->department_id) {
+                $department = DB::connection('pilargroup')
+                    ->table('master_departments')
+                    ->where('id', $updatedUser->department_id)
+                    ->value('name');
+            }
+
+            (new \App\Services\TicketService())->syncUser($updatedUser, $department);
         }
 
         if ($request->has('apps')) {

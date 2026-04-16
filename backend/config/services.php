@@ -34,5 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'ticket' => [
+        'url' => env('TICKET_SERVICE_URL', 'https://ticket.pilargroup.id'),
+        'internal_secret' => env('INTERNAL_SYNC_SECRET'),
+    ],
 
 ];
