@@ -103,6 +103,8 @@ class SSOController extends Controller
      */
     public function verify(Request $request)
     {
+        Log::info('SSO verify hit', $request->all());
+        
         $request->validate([
             'token'         => 'required|string',
             'client_id'     => 'required|string',
