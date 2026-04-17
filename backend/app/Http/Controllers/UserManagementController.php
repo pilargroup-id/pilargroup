@@ -287,6 +287,12 @@ class UserManagementController extends Controller
                 ->pluck('mp.slug')
                 ->toArray();
 
+        \Log::info('DEBUG SYNC', [
+            'userApps'    => $userApps,
+            'hasTicket'   => in_array('ticket', $userApps),
+            'requestApps' => $request->input('apps'),
+        ]);
+
         if (in_array('ticket', $userApps)) {
             // Ambil nama department
             $department = null;
