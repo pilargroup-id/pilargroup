@@ -363,6 +363,15 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
+        // Simpan username dan cek apps sebelum delete
+        $username = $user->username;
+        $userApps = DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $id)
+            ->pluck('mp.slug')
+            ->toArray();
+
         try {
             DB::connection('pilargroup')->transaction(function () use ($id) {
                 DB::connection('pilargroup')
@@ -376,11 +385,16 @@ class UserManagementController extends Controller
                     ->delete();
             });
 
+            // Sync delete ke ticket kalau user punya akses ticket
+            if (in_array('ticket', $userApps)) {
+                (new \App\Services\TicketService())->deleteUser($username);
+            }
+
             return response()->json(['message' => 'User deleted successfully']);
         } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'Error deleting user',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

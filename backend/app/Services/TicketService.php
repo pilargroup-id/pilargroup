@@ -63,4 +63,34 @@ class TicketService
             ]);
         }
     }
+
+    public function deleteUser(string $username): void
+    {
+        if (!$this->baseUrl || !$this->secret) {
+            Log::warning('TicketService: URL atau secret belum dikonfigurasi, delete dilewati.');
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'X-Internal-Secret' => $this->secret,
+                'Accept'            => 'application/json',
+            ])->delete($this->baseUrl . '/api/internal/sync-user/' . $username);
+
+            if ($response->successful()) {
+                Log::info('TicketService: delete berhasil', ['username' => $username]);
+            } else {
+                Log::warning('TicketService: delete gagal', [
+                    'username' => $username,
+                    'status'   => $response->status(),
+                    'body'     => $response->body(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('TicketService: delete exception', [
+                'username' => $username,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
 }
