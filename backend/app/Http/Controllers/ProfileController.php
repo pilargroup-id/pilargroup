@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use App\Services\TicketService;
 
 class ProfileController extends Controller
 {
@@ -14,8 +15,8 @@ class ProfileController extends Controller
             'current_password' => 'required',
             'new_username'     => 'nullable|string|min:3',
             'new_password'     => 'nullable|string|min:6',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string|max:20',
+            'email'            => 'nullable|email',
+            'phone'            => 'nullable|string|max:20',
         ]);
 
         if (!$request->new_username && !$request->new_password && !$request->email && !$request->phone) {
@@ -71,6 +72,32 @@ class ProfileController extends Controller
             ->table('central_users')
             ->where('id', $userId)
             ->update($updates);
+
+        // Ambil data user terbaru setelah update
+        $updatedUser = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $userId)
+            ->first();
+
+        // Cek apakah user punya akses ticket
+        $userApps = DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $userId)
+            ->pluck('mp.slug')
+            ->toArray();
+
+        if (in_array('ticket', $userApps)) {
+            $department = null;
+            if ($updatedUser->department_id) {
+                $department = DB::connection('pilargroup')
+                    ->table('master_departments')
+                    ->where('id', $updatedUser->department_id)
+                    ->value('name');
+            }
+
+            (new TicketService())->syncUser($updatedUser, $department);
+        }
 
         return response()->json([
             'success' => true,

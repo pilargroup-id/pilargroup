@@ -293,19 +293,7 @@ class UserManagementController extends Controller
             'requestApps' => $request->input('apps'),
         ]);
 
-        if (in_array('ticket', $userApps)) {
-            // Ambil nama department
-            $department = null;
-            if ($updatedUser->department_id) {
-                $department = DB::connection('pilargroup')
-                    ->table('master_departments')
-                    ->where('id', $updatedUser->department_id)
-                    ->value('name');
-            }
-
-            (new \App\Services\TicketService())->syncUser($updatedUser, $department);
-        }
-
+        // Update apps dulu ke DB
         if ($request->has('apps')) {
             $selectedApps = array_values(array_filter((array) $request->input('apps'), function ($app) {
                 return is_string($app) && trim($app) !== '';
@@ -335,6 +323,26 @@ class UserManagementController extends Controller
                         ]);
                 }
             });
+        }
+
+        // Setelah apps di DB sudah final, baru cek dan sync ke ticket
+        $finalUserApps = DB::connection('pilargroup')
+            ->table('central_user_projects as cup')
+            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
+            ->where('cup.user_id', $id)
+            ->pluck('mp.slug')
+            ->toArray();
+
+        if (in_array('ticket', $finalUserApps)) {
+            $department = null;
+            if ($updatedUser->department_id) {
+                $department = DB::connection('pilargroup')
+                    ->table('master_departments')
+                    ->where('id', $updatedUser->department_id)
+                    ->value('name');
+            }
+
+            (new \App\Services\TicketService())->syncUser($updatedUser, $department);
         }
 
         return response()->json(['message' => 'User updated successfully']);
