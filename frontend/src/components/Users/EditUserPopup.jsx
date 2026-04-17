@@ -18,7 +18,7 @@ const initialFormState = {
   phone: '',
   department_id: '',
   job_position: '',
-  job_level_id: '',
+  job_level: '',
   internal_id: '',
   is_active: 'true',
   apps: [],
