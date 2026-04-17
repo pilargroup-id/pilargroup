@@ -177,7 +177,7 @@ function AppLayout({
 
         <main
           className="dashboard-main"
-          style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate' }}
+          style={{ position: 'relative', overflowX: 'hidden', isolation: 'isolate' }}
         >
           <BackgroundMain />
           <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
