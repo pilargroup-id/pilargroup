@@ -72,11 +72,10 @@ function buildUpdateUserPayload(formValues) {
     payload.name = name
   }
 
-  // ✅ Selalu include, meski kosong → kirim null biar backend bisa null-kan
-  payload.email = formValues.email.trim() || null
-  payload.phone = normalizePhoneNumber(formValues.phone) || null
+  payload.email        = formValues.email.trim() || null
+  payload.phone        = normalizePhoneNumber(formValues.phone) || null
   payload.job_position = formValues.job_position.trim() || null
-  payload.job_level = formValues.job_level.trim() || null
+  payload.job_level_id = formValues.job_level_id ? parseInt(formValues.job_level_id) : null  // ← fix
 
   const departmentId = Number(formValues.department_id)
   if (Number.isInteger(departmentId) && departmentId > 0) {
