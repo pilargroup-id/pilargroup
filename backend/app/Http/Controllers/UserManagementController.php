@@ -419,9 +419,9 @@ class UserManagementController extends Controller
                 (new \App\Services\TicketService())->deleteUser($username);
             }
 
-            if (in_array('assetit', $userApps)) {
-                (new SnipeItService())->deleteUser($username);
-            }
+
+            (new SnipeItService())->deleteUser($username);
+
 
             return response()->json(['message' => 'User deleted successfully']);
         } catch (\Throwable $e) {

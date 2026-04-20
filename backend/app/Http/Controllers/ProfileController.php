@@ -101,7 +101,7 @@ class ProfileController extends Controller
             (new TicketService())->syncUser($updatedUser, $department, $oldUsername);
         }
 
-        if (in_array('assetit', $userApps)) {
+        
             $snipeDept = null;
             if ($updatedUser->department_id) {
                 $snipeDept = DB::connection('pilargroup')
@@ -119,7 +119,7 @@ class ProfileController extends Controller
             }
 
             (new \App\Services\SnipeItService())->syncUser($updatedUser, $snipeDept, $snipeJobLevel, $oldUsername);
-        }
+        
 
         return response()->json([
             'success' => true,
