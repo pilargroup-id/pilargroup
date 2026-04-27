@@ -31,7 +31,7 @@ function buildProjectLabel(project, index) {
 
 function buildProjectDetail(project, hasAccess = true) {
   if (!hasAccess) {
-    return 'Project tampil, tetapi akses run belum diberikan untuk akun Anda.'
+    return 'Silakan hubungi IT untuk membuka akses ke menu ini'
   }
 
   if (project.descriptionRaw) {
