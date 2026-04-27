@@ -115,79 +115,90 @@ function LoginPage() {
             <p className="login-page__brand-caption">Internal Project PT Pilar Niaga Makmur</p>
           </div>
         </div>
-        <p className="login-page__footer">Copyright 2025 PT. Pilar Niaga Makmur</p>
+
+        <p className="login-page__footer login-page__footer--desktop">
+          {/* <span className="login-page__footer-icon" aria-hidden="true">&copy;</span> */}
+          <span>Copyright 2026 PT. Pilar Niaga Makmur</span>
+        </p>
       </div>
 
       <div className="login-page__panel">
-        <div className="login-page__card">
-          <div className="login-page__card-header">
-            <h2 className="login-page__card-title">Login</h2>
-            <p className="login-page__card-subtitle">
-              {ssoToken
-                ? 'Login untuk melanjutkan ke aplikasi yang diminta.'
-                : 'Welcome back! Please enter your details'}
-            </p>
+        <div className="login-page__panel-content">
+          <div className="login-page__card">
+            <div className="login-page__card-header">
+              <h2 className="login-page__card-title">Login</h2>
+              <p className="login-page__card-subtitle">
+                {ssoToken
+                  ? 'Login untuk melanjutkan ke aplikasi yang diminta.'
+                  : 'Welcome back! Please enter your details'}
+              </p>
+            </div>
+
+            <form className="login-page__form" onSubmit={handleSubmit}>
+              <label className="login-page__field">
+                <span className="login-page__label">Username *</span>
+                <span className="login-page__input-shell">
+                  <UserCircle className="login-page__input-icon" size={20} />
+                  <input
+                    className="login-page__input"
+                    type="text"
+                    value={username}
+                    onChange={(event) => {
+                      setUsername(event.target.value)
+                      setErrorMessage('')
+                    }}
+                    placeholder="Enter your username"
+                    autoComplete="username"
+                    disabled={isSubmitting}
+                  />
+                </span>
+              </label>
+
+              <label className="login-page__field">
+                <span className="login-page__label">Password *</span>
+                <span className="login-page__input-shell">
+                  <LockKeyholeCircle className="login-page__input-icon" size={20} />
+                  <input
+                    className="login-page__input"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value)
+                      setErrorMessage('')
+                    }}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    disabled={isSubmitting}
+                  />
+                  <button
+                    type="button"
+                    className="login-page__password-toggle"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((current) => !current)}
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </span>
+              </label>
+
+              {errorMessage ? <p className="login-page__alert">{errorMessage}</p> : null}
+
+              <button className="login-page__submit" type="submit" disabled={isSubmitting}>
+                <span>{isSubmitting ? 'Memproses...' : 'Login'}</span>
+                {isSubmitting ? (
+                  <CircleCut className="login-page__submit-icon login-page__submit-icon--spinning" size={18} />
+                ) : (
+                  <ArrowCircleRight className="login-page__submit-icon" size={18} />
+                )}
+              </button>
+            </form>
           </div>
 
-          <form className="login-page__form" onSubmit={handleSubmit}>
-            <label className="login-page__field">
-              <span className="login-page__label">Username *</span>
-              <span className="login-page__input-shell">
-                <UserCircle className="login-page__input-icon" size={20} />
-                <input
-                  className="login-page__input"
-                  type="text"
-                  value={username}
-                  onChange={(event) => {
-                    setUsername(event.target.value)
-                    setErrorMessage('')
-                  }}
-                  placeholder="Enter your username"
-                  autoComplete="username"
-                  disabled={isSubmitting}
-                />
-              </span>
-            </label>
-
-            <label className="login-page__field">
-              <span className="login-page__label">Password *</span>
-              <span className="login-page__input-shell">
-                <LockKeyholeCircle className="login-page__input-icon" size={20} />
-                <input
-                  className="login-page__input"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value)
-                    setErrorMessage('')
-                  }}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  className="login-page__password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  onClick={() => setShowPassword((current) => !current)}
-                  disabled={isSubmitting}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </span>
-            </label>
-
-            {errorMessage ? <p className="login-page__alert">{errorMessage}</p> : null}
-
-            <button className="login-page__submit" type="submit" disabled={isSubmitting}>
-              <span>{isSubmitting ? 'Memproses...' : 'Login'}</span>
-              {isSubmitting ? (
-                <CircleCut className="login-page__submit-icon login-page__submit-icon--spinning" size={18} />
-              ) : (
-                <ArrowCircleRight className="login-page__submit-icon" size={18} />
-              )}
-            </button>
-          </form>
+          <p className="login-page__footer login-page__footer--mobile">
+            <span className="login-page__footer-icon" aria-hidden="true">&copy;</span>
+            <span>2026 PT. Pilar Niaga Makmur</span>
+          </p>
         </div>
       </div>
     </section>

@@ -1,4 +1,5 @@
 .login-page {
+  position: relative;
   --login-left-background: linear-gradient(180deg, #35528f 0%, #2b4579 100%);
   --login-left-overlay: linear-gradient(135deg, rgba(11, 26, 63, 0.18), rgba(11, 26, 63, 0.42));
   --login-card-shadow: 0 28px 80px rgba(27, 47, 92, 0.18);
@@ -31,7 +32,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('../image/gedung_square.png');
+  background-image: url('../image/gedung.svg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -95,9 +96,33 @@
 
 .login-page__footer {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-page__footer-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.72rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.login-page__footer--desktop {
+  align-self: flex-start;
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.login-page__footer--mobile {
+  display: none;
 }
 
 .login-page__panel {
@@ -120,10 +145,20 @@
   pointer-events: none;
 }
 
+.login-page__panel-content {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 560px);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  transform: translateY(-18px);
+}
+
 .login-page__card {
   position: relative;
-  width: min(100%, 560px);
-  padding: 42px;
+  width: 100%;
+  padding: 50px 42px 46px;
   border: 1px solid rgba(31, 50, 98, 0.08);
   border-radius: 32px;
   background: rgba(255, 255, 255, 0.94);
@@ -345,20 +380,32 @@
     padding: 32px;
   }
 
+  .login-page__panel-content {
+    transform: translateY(-12px);
+  }
+
   .login-page__card {
-    padding: 34px;
+    padding: 40px 34px 38px;
+  }
+
+  .login-page__footer {
+    align-self: flex-start;
   }
 }
 
 @media (max-width: 920px) {
   .login-page {
     grid-template-columns: 1fr;
-    background: linear-gradient(180deg, #2f4c86 0%, #2b4579 44%, #f6f7fa 44%, #f6f7fa 100%);
+    grid-template-rows: 40dvh 60dvh;
+    min-height: 100dvh;
+    background: linear-gradient(180deg, #2f4c86 0%, #2b4579 40%, #f6f7fa 40%, #f6f7fa 100%);
   }
 
   .login-page__hero {
-    min-height: auto;
-    padding: 28px 24px 92px;
+    height: 100%;
+    min-height: 0;
+    padding: 20px 16px 20px;
+    justify-content: flex-start;
   }
 
   .login-page__hero::before {
@@ -369,20 +416,45 @@
   .login-page__hero::after {
     left: 50%;
     right: auto;
-    bottom: -32%;
-    width: min(96vw, 760px);
+    bottom: -18%;
+    width: min(92vw, 640px);
     transform: translateX(-50%);
     opacity: 0.18;
   }
 
   .login-page__panel {
-    margin-top: -64px;
+    height: 100%;
+    margin-top: -56px;
     padding: 0 24px 24px;
     background: transparent;
+    display: grid;
+    align-content: start;
+    justify-items: center;
+  }
+
+  .login-page__panel-content {
+    width: min(100%, 640px);
+    gap: 16px;
+    transform: translateY(-14px);
   }
 
   .login-page__card {
-    width: min(100%, 640px);
+    width: 100%;
+    padding: 34px 30px 30px;
+  }
+
+  .login-page__footer--desktop {
+    display: none;
+  }
+
+  .login-page__footer--mobile {
+    display: inline-flex;
+    margin-top: 0;
+    color: #8f97a6;
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: center;
+    justify-self: center;
   }
 }
 
@@ -405,16 +477,21 @@
   }
 
   .login-page__hero {
-    padding: 20px 16px 88px;
+    padding: 16px 14px 16px;
   }
 
   .login-page__panel {
-    margin-top: -52px;
-    padding: 0 16px 16px;
+    margin-top: -48px;
+    padding: 0 16px 14px;
+  }
+
+  .login-page__panel-content {
+    gap: 14px;
+    transform: translateY(-10px);
   }
 
   .login-page__card {
-    padding: 24px 20px;
+    padding: 22px 18px;
     border-radius: 24px;
   }
 
@@ -430,5 +507,16 @@
   .login-page__submit {
     height: 54px;
     border-radius: 16px;
+  }
+
+  .login-page__footer--mobile {
+    color: #9aa1af;
+    font-size: 0.82rem;
+  }
+
+  .login-page__footer-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    font-size: 0.66rem;
   }
 }
