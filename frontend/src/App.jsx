@@ -9,6 +9,7 @@ import UserPage from '@/pages/UserPage'
 import { isAuthenticated, getToken } from '@/services/api'
 import { canAccessPath } from '@/services/accessControl'
 import '@/assets/styles/app.css'
+import { useSessionGuard } from '@/hooks/useSessionGuard'
 
 const routes = {
   '/dashboard': DashboardPage,
@@ -126,6 +127,7 @@ function resolvePath(pathname) {
 
 function App() {
   const [currentPath, setCurrentPath] = useState(() => resolvePath(window.location.pathname))
+  useSessionGuard()
 
   useEffect(() => {
     // 1. Cek return_url dulu (dari sub-project redirect)

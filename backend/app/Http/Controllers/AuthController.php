@@ -41,7 +41,8 @@ class AuthController extends Controller
                 'cu.job_position',
                 'cu.job_level_id',
                 'mjl.name as job_level',
-                'mjl.level as job_level_value'
+                'mjl.level as job_level_value',
+                'cu.token_version'
             )
             ->where('cu.id', $user->id)
             ->first();
@@ -49,17 +50,18 @@ class AuthController extends Controller
         $apps = $this->getUserApps($user->id);
 
         return [
-            'id' => $userProfile?->id ?? $user->id,
-            'internal_id' => $userProfile?->internal_id ?? $user->internal_id,
-            'username' => $userProfile?->username ?? $user->username,
-            'name' => $userProfile?->name ?? $user->name,
-            'email' => $userProfile?->email ?? $user->email,
-            'phone' => $userProfile?->phone ?? $user->phone,
+            'id'            => $userProfile?->id ?? $user->id,
+            'internal_id'   => $userProfile?->internal_id ?? $user->internal_id,
+            'username'      => $userProfile?->username ?? $user->username,
+            'name'          => $userProfile?->name ?? $user->name,
+            'email'         => $userProfile?->email ?? $user->email,
+            'phone'         => $userProfile?->phone ?? $user->phone,
             'department_id' => $userProfile?->department_id ?? $user->department_id ?? null,
-            'department' => $userProfile?->department ?? null,
-            'job_position' => $userProfile?->job_position ?? $user->job_position,
-            'job_level' => $userProfile?->job_level ?? $user->job_level,
-            'apps' => $apps,
+            'department'    => $userProfile?->department ?? null,
+            'job_position'  => $userProfile?->job_position ?? $user->job_position,
+            'job_level'     => $userProfile?->job_level ?? $user->job_level,
+            'apps'          => $apps,
+            'cv'            => $userProfile?->token_version ?? $user->token_version,
         ];
     }
 
