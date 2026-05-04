@@ -93,4 +93,48 @@ class TicketService
             ]);
         }
     }
+
+    public function forceLogout(string $userId): void
+    {
+        if (!$this->baseUrl || !$this->secret) {
+            Log::warning('TicketService: URL atau secret belum dikonfigurasi, force logout dilewati.');
+            return;
+        }
+
+        // Ambil username dari DB pilargroup
+        $user = \DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $userId)
+            ->select('username')
+            ->first();
+
+        if (!$user) {
+            Log::warning('TicketService: forceLogout user tidak ditemukan', ['user_id' => $userId]);
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'X-Internal-Secret' => $this->secret,
+                'Accept'            => 'application/json',
+            ])->post($this->baseUrl . '/api/internal/force-logout', [
+                'username' => $user->username,
+            ]);
+
+            if ($response->successful()) {
+                Log::info('TicketService: forceLogout berhasil', ['username' => $user->username]);
+            } else {
+                Log::warning('TicketService: forceLogout gagal', [
+                    'username' => $user->username,
+                    'status'   => $response->status(),
+                    'body'     => $response->body(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('TicketService: forceLogout exception', [
+                'username' => $user->username,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
 }

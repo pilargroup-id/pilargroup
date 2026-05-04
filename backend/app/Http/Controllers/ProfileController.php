@@ -85,7 +85,7 @@ class ProfileController extends Controller
                 ->increment('token_version');
 
             // (new SnipeItService())->forceRelogin($updatedUser->username);
-            // (new TicketService())->forceLogout($userId);
+            (new TicketService())->forceLogout($userId);
         }
 
         // Ambil data user terbaru setelah update
