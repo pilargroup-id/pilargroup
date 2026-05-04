@@ -33,6 +33,9 @@ const handleSubmit = async (event) => {
   event.preventDefault()
   if (isSubmitting) return
 
+  console.log('FULL URL saat submit:', window.location.href)
+  console.log('SEARCH:', window.location.search)
+
   setErrorMessage('')
   setIsSubmitting(true)
 
