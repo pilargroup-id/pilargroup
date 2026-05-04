@@ -108,11 +108,38 @@ class AuthController extends Controller
             'department_id' => $authUser['department_id'],
             'department' => $authUser['department'],
             'apps' => $authUser['apps'],
+            'cv' => $user->token_version,
         ])->fromUser($user);
 
         return response()->json([
             'token' => $token,
             'user'  => $authUser,
+        ]);
+    }
+
+    // GET /api/auth/status
+    // Dipanggil sub-projects untuk polling validitas token
+    public function status(Request $request)
+    {
+        $userId  = $request->user_id;
+        $cvFromToken = $request->auth_cv;
+
+        $user = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $userId)
+            ->where('is_active', 1)
+            ->select('token_version')
+            ->first();
+
+        if (!$user) {
+            return response()->json(['valid' => false], 200);
+        }
+
+        $valid = $cvFromToken !== null && (int)$cvFromToken === (int)$user->token_version;
+
+        return response()->json([
+            'valid'         => $valid,
+            'token_version' => (int)$user->token_version,
         ]);
     }
 

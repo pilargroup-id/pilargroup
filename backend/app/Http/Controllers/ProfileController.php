@@ -75,6 +75,18 @@ class ProfileController extends Controller
             ->where('id', $userId)
             ->update($updates);
 
+        $credentialChanged = in_array('username', $changed) || in_array('password', $changed);
+
+        if ($credentialChanged) {
+            DB::connection('pilargroup')
+                ->table('central_users')
+                ->where('id', $userId)
+                ->increment('token_version');
+
+            (new SnipeItService())->forceRelogin($updatedUser->username);
+            (new TicketService())->forceLogout($userId);
+        }
+
         // Ambil data user terbaru setelah update
         $updatedUser = DB::connection('pilargroup')
             ->table('central_users')

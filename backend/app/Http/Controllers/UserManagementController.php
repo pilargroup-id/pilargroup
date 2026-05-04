@@ -281,6 +281,18 @@ class UserManagementController extends Controller
             ->where('id', $id)
             ->update($updates);
 
+        $credentialChanged = isset($updates['username']) || isset($updates['password']);
+
+        if ($credentialChanged) {
+            DB::connection('pilargroup')
+                ->table('central_users')
+                ->where('id', $id)
+                ->increment('token_version');
+
+            (new SnipeItService())->forceRelogin($updatedUser->username);
+            (new TicketService())->forceLogout($id);
+        }
+
         // Ambil data user terbaru setelah update
         $updatedUser = DB::connection('pilargroup')
             ->table('central_users')
