@@ -6,7 +6,7 @@ import LoginPage from '@/pages/LoginPage'
 import MasterDepartementsPage from '@/pages/MasterDepartements'
 import MasterProjectPage from '@/pages/MasterProject'
 import UserPage from '@/pages/UserPage'
-import { isAuthenticated, getToken } from '@/services/api'  // tambah getToken
+import { isAuthenticated, getToken } from '@/services/api'
 import { canAccessPath } from '@/services/accessControl'
 import '@/assets/styles/app.css'
 
@@ -16,6 +16,30 @@ const routes = {
   '/master-departments': MasterDepartementsPage,
   '/master-project': MasterProjectPage,
   '/users': UserPage,
+}
+
+// Handle return_url saat user sudah login (misal: direct akses dari sub-project)
+function handleReturnUrlIfNeeded() {
+  if (!isAuthenticated()) return false
+
+  const params = new URLSearchParams(window.location.search)
+  const returnUrl = params.get('return_url')
+
+  if (!returnUrl) return false
+
+  try {
+    const target = new URL(returnUrl)
+    if (target.hostname.endsWith('pilargroup.id')) {
+      const token = getToken()
+      target.searchParams.set('token', token)
+      window.location.href = target.toString()
+      return true
+    }
+  } catch {
+    // URL tidak valid, lanjut normal
+  }
+
+  return false
 }
 
 // Handle SAML respond jika user sudah login dan ada saml_token di URL
@@ -36,14 +60,11 @@ async function handleSamlIfNeeded() {
       body: JSON.stringify({ saml_token: samlToken }),
     })
 
-    // Token expired/tidak ada → redirect dashboard
     if (res.status === 400) {
       window.location.href = 'https://pilargroup.id/dashboard'
       return true
     }
 
-    // User tidak ada di Snipe-IT → backend return HTML redirect
-    // Browser akan ikuti redirect dari JS di dalam HTML response
     if (!res.ok) {
       window.location.href = 'https://pilargroup.id/dashboard'
       return true
@@ -51,7 +72,6 @@ async function handleSamlIfNeeded() {
 
     const html = await res.text()
 
-    // Cek apakah response adalah redirect HTML (bukan SAML form)
     if (!html.includes('SAMLResponse')) {
       window.location.href = 'https://pilargroup.id/dashboard'
       return true
@@ -108,9 +128,13 @@ function App() {
   const [currentPath, setCurrentPath] = useState(() => resolvePath(window.location.pathname))
 
   useEffect(() => {
-    // Cek SAML dulu sebelum routing normal
+    // 1. Cek return_url dulu (dari sub-project redirect)
+    const returnHandled = handleReturnUrlIfNeeded()
+    if (returnHandled) return
+
+    // 2. Cek SAML
     handleSamlIfNeeded().then((handled) => {
-      if (handled) return  // dokumen sudah di-replace, stop
+      if (handled) return
 
       const syncRoute = () => {
         const nextPath = resolvePath(window.location.pathname)
