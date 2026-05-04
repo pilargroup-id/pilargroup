@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { clearAuthSession, getToken } from '@/services/api'
+import { clearAuthSession, getToken, setStoredUser } from '@/services/api'
 
 const POLL_INTERVAL = 5_000
-const STATUS_URL = '/api/auth/status' // relative, karena PG adalah origin-nya sendiri
+const STATUS_URL = '/api/auth/status'
 
 function getStoredCv() {
   try {
@@ -26,6 +26,18 @@ export function useSessionGuard() {
   useEffect(() => {
     const token = getToken()
     if (!token) return
+
+    // Kalau cv belum ada di localStorage, refresh dari /api/auth/me dulu
+    if (getStoredCv() === null) {
+      fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(user => {
+          if (user) setStoredUser(user)
+        })
+        .catch(() => {})
+    }
 
     const check = async () => {
       try {
