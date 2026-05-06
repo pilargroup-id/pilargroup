@@ -160,13 +160,17 @@ function resolvePath(pathname) {
 }
 
 function App() {
-    console.log('App init URL:', window.location.href)
+  console.log('App init URL:', window.location.href)
   const [currentPath, setCurrentPath] = useState(() => resolvePath(window.location.pathname))
   console.log('resolvePath called, pathname:', window.location.pathname, 'search:', window.location.search)
   useSessionGuard()
 
-  useEffect(() => {
-    // 1. Cek return_url dulu (dari sub-project redirect)
+useEffect(() => {
+  // 0. Cek sso_authorize dulu (dari direct akses ticket)
+  handleSsoAuthorizeIfNeeded().then((handled) => {
+    if (handled) return
+
+    // 1. Cek return_url
     const returnHandled = handleReturnUrlIfNeeded()
     if (returnHandled) return
 
@@ -176,23 +180,22 @@ function App() {
 
       const syncRoute = () => {
         const nextPath = resolvePath(window.location.pathname)
-
         if (window.location.pathname !== nextPath) {
-            const search = nextPath === '/login' ? window.location.search : ''
-            window.history.replaceState({}, '', nextPath + search)
+          const search = nextPath === '/login' ? window.location.search : ''
+          window.history.replaceState({}, '', nextPath + search)
         }
-
         setCurrentPath(nextPath)
       }
 
       syncRoute()
       window.addEventListener('popstate', syncRoute)
     })
+  })
 
-    return () => {
-      window.removeEventListener('popstate', () => {})
-    }
-  }, [])
+  return () => {
+    window.removeEventListener('popstate', () => {})
+  }
+}, [])
 
   const ActivePage = routes[currentPath] ?? DashboardPage
 
