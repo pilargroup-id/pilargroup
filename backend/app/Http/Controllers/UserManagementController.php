@@ -289,7 +289,7 @@ class UserManagementController extends Controller
                 ->where('id', $id)
                 ->increment('token_version');
 
-            // (new SnipeItService())->forceRelogin($updatedUser->username);
+            (new SnipeItService())->forceRelogin($updatedUser->username);
             (new TicketService())->forceLogout($id);
         }
 

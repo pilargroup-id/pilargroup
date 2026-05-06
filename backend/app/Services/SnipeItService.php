@@ -173,6 +173,24 @@ class SnipeItService
         }
     }
 
+    public function forceRelogin(string $username): void
+    {
+        if (empty($this->token)) return;
+
+        $match = $this->findUser($username);
+        if (!$match) return;
+
+        $snipeId = $match['id'];
+
+        Http::withToken($this->token)
+            ->patch("{$this->baseUrl}/api/v1/users/{$snipeId}", ['activated' => false]);
+
+        Http::withToken($this->token)
+            ->patch("{$this->baseUrl}/api/v1/users/{$snipeId}", ['activated' => true]);
+
+        Log::info("SnipeIt forceRelogin: {$username}");
+    }
+
     public function deleteUser(string $username): void
     {
         if (empty($this->token)) return;
