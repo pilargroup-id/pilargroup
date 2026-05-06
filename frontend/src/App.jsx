@@ -43,6 +43,40 @@ function handleReturnUrlIfNeeded() {
   return false
 }
 
+async function handleSsoAuthorizeIfNeeded() {
+  if (!isAuthenticated()) return false
+
+  const params = new URLSearchParams(window.location.search)
+  const ssoAuthorize = params.get('sso_authorize')
+  const clientId     = params.get('client_id')
+  const redirectUri  = params.get('redirect_uri')
+  const ssoState     = params.get('state')
+
+  if (!ssoAuthorize || !clientId || !redirectUri || !ssoState) return false
+
+  try {
+    const token = getToken()
+    const ssoParams = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, state: ssoState })
+
+    const res = await fetch(`/api/sso/authorize?${ssoParams}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      }
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      window.location.href = data.redirect_url
+      return true
+    }
+  } catch {
+    // fallback
+  }
+
+  return false
+}
+
 // Handle SAML respond jika user sudah login dan ada saml_token di URL
 async function handleSamlIfNeeded() {
   const params = new URLSearchParams(window.location.search)
