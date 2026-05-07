@@ -1,6 +1,10 @@
 import { ApiError, getToken } from '@/services/api'
 import { canAccessProject } from '@/services/accessControl'
 import { getProjects } from '@/services/master/getProjects'
+import {
+  hideProjectLaunchScreen,
+  showProjectLaunchScreen,
+} from '@/services/projectLaunchOverlay'
 
 const setupChecklist = [
   {
@@ -16,6 +20,8 @@ const setupChecklist = [
     description: 'Simpan ringkasan owner, status penanganan, dan target waktu agar progres helpdesk mudah dipantau dari satu layar.',
   },
 ]
+
+let isProjectLaunchInProgress = false
 
 function formatCount(value) {
   return String(value).padStart(2, '0')
@@ -154,44 +160,12 @@ if (SSO_PROJECTS.includes(project.slug)) {
 }
 
 export async function launchProject(project) {
-  const SSO_PROJECTS = ['ticket']
-
-  if (SSO_PROJECTS.includes(project.slug)) {
-    const token = getToken()
-    if (!token) throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
-
-    const projectOrigin = new URL(project.urlRaw).origin
-
-    // Hit ticket untuk generate & simpan state
-    const ssoUrlRes = await fetch(`${projectOrigin}/api/auth/sso-url`)
-    if (!ssoUrlRes.ok) throw new ApiError('Gagal generate SSO URL.')
-
-    const { state, redirect_uri } = await ssoUrlRes.json()
-
-    const params = new URLSearchParams({
-      client_id:    project.slug,
-      redirect_uri: redirect_uri,
-      state,
-    })
-
-    const res = await fetch(`/api/sso/authorize?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept':        'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      throw new ApiError(data.message || 'SSO gagal.')
-    }
-
-    const data = await res.json()
-    window.location.assign(data.redirect_url)
+  if (isProjectLaunchInProgress) {
     return
   }
 
-  // Flow lama
+  const SSO_PROJECTS = ['ticket']
+
   const token = getToken()
   if (!token) throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
 
@@ -199,15 +173,57 @@ export async function launchProject(project) {
   if (!project?.isActive) throw new ApiError('Project ini sedang inactive dan tidak bisa dijalankan.')
   if (!project?.urlRaw) throw new ApiError('URL project belum tersedia.')
 
-  const launchUrl = buildProjectUrl(project.urlRaw)
-  launchUrl.searchParams.set('token',  token)
-  launchUrl.searchParams.set('source', 'dashboard-it')
+  isProjectLaunchInProgress = true
 
-  if (project.slug && project.slug !== 'no-slug') {
-    launchUrl.searchParams.set('project', project.slug)
+  try {
+    await showProjectLaunchScreen(project?.name ?? project?.value)
+
+    if (SSO_PROJECTS.includes(project.slug)) {
+      const projectOrigin = new URL(project.urlRaw).origin
+
+      // Hit ticket untuk generate & simpan state
+      const ssoUrlRes = await fetch(`${projectOrigin}/api/auth/sso-url`)
+      if (!ssoUrlRes.ok) throw new ApiError('Gagal generate SSO URL.')
+
+      const { state, redirect_uri } = await ssoUrlRes.json()
+
+      const params = new URLSearchParams({
+        client_id: project.slug,
+        redirect_uri,
+        state,
+      })
+
+      const res = await fetch(`/api/sso/authorize?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new ApiError(data.message || 'SSO gagal.')
+      }
+
+      const data = await res.json()
+      window.location.assign(data.redirect_url)
+      return
+    }
+
+    const launchUrl = buildProjectUrl(project.urlRaw)
+    launchUrl.searchParams.set('token', token)
+    launchUrl.searchParams.set('source', 'dashboard-it')
+
+    if (project.slug && project.slug !== 'no-slug') {
+      launchUrl.searchParams.set('project', project.slug)
+    }
+
+    window.location.assign(launchUrl.toString())
+  } catch (error) {
+    isProjectLaunchInProgress = false
+    hideProjectLaunchScreen()
+    throw error
   }
-
-  window.location.assign(launchUrl.toString())
 }
 
 export async function getDashboardProjects() {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CircleCut } from '@untitledui/icons'
 
 import ChangeProfileMobile from '@/components/Template/ChangeProfileMobile'
 import BackgroundMain from '@/components/Template/BackgroundMain'
@@ -11,6 +12,7 @@ import {
   getPrimaryNavigationItemsForUser,
   getSecondaryNavigationItemsForUser,
 } from '@/services/accessControl'
+import { subscribeProjectLaunchScreen } from '@/services/projectLaunchOverlay'
 
 const defaultUser = {
   name: 'Al fatih',
@@ -94,6 +96,7 @@ function AppLayout({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isChangeProfileOpen, setIsChangeProfileOpen] = useState(false)
+  const [launchingProjectName, setLaunchingProjectName] = useState('')
   const resolvedUser = normalizeUser({
     ...(getStoredUser() || {}),
     ...(user || {}),
@@ -114,6 +117,12 @@ function AppLayout({
 
     setIsSidebarCollapsed(false)
   }, [isDesktop])
+
+  useEffect(() => {
+    return subscribeProjectLaunchScreen(({ isOpen, projectName }) => {
+      setLaunchingProjectName(isOpen ? projectName : '')
+    })
+  }, [])
 
   const sidebarCollapsed = isDesktop && isSidebarCollapsed
   const appShellClassName = [
@@ -180,6 +189,37 @@ function AppLayout({
         tabIndex={!isDesktop && isMobileSidebarOpen ? 0 : -1}
         onClick={() => setIsMobileSidebarOpen(false)}
       />
+
+      {launchingProjectName ? (
+        <div className="dashboard-popup-overlay dashboard-launch-overlay" role="presentation">
+          <div
+            className="dashboard-popup dashboard-launch-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-launch-popup-title"
+          >
+            <div className="dashboard-popup__header">
+              <div>
+                <p className="dashboard-popup__eyebrow">Dashboard</p>
+                <h2 className="dashboard-popup__title" id="dashboard-launch-popup-title">
+                  Opening Project
+                </h2>
+              </div>
+            </div>
+
+            <div className="dashboard-popup__body dashboard-launch-popup__body">
+              <CircleCut
+                size={28}
+                className="dashboard-popup__spinner dashboard-launch-popup__spinner"
+              />
+              <p className="dashboard-launch-popup__title">Opening project...</p>
+              <p className="dashboard-launch-popup__detail">
+                Sedang membuka {launchingProjectName}. Mohon tunggu sebentar.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isDesktop ? (
         <ChangeProfilePopup

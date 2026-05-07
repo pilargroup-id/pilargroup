@@ -33,12 +33,17 @@ function DashboardPage({ activePath = '/dashboard' }) {
   }, [])
 
   const handleRunProject = async (project) => {
-      setLaunchError('')
-      try {
-        await launchProject(project)
-      } catch (error) {
-        setLaunchError(error?.message || 'Project gagal dijalankan.')
-      }
+    if (!project?.isRunnable) {
+      return
+    }
+
+    setLaunchError('')
+
+    try {
+      await launchProject(project)
+    } catch (error) {
+      setLaunchError(error?.message || 'Project gagal dijalankan.')
+    }
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()

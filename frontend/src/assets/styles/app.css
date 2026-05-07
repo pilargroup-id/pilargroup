@@ -1361,6 +1361,40 @@
   animation: dashboard-popup-spin 0.8s linear infinite;
 }
 
+.dashboard-launch-overlay {
+  z-index: 1500;
+}
+
+.dashboard-launch-popup {
+  width: min(100%, 420px);
+}
+
+.dashboard-launch-popup__body {
+  display: grid;
+  justify-items: center;
+  gap: 0.85rem;
+  padding-top: 1.75rem;
+  padding-bottom: 2rem;
+  text-align: center;
+}
+
+.dashboard-launch-popup__spinner {
+  color: var(--primary-blue);
+}
+
+.dashboard-launch-popup__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.dashboard-launch-popup__detail {
+  margin: 0;
+  color: rgba(71, 85, 105, 0.96);
+  line-height: 1.6;
+}
+
 .change-profile-mobile {
   position: fixed;
   inset: 0;
