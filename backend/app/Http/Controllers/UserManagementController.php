@@ -281,6 +281,12 @@ class UserManagementController extends Controller
             ->where('id', $id)
             ->update($updates);
 
+        // Ambil data user terbaru setelah update
+        $updatedUser = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $id)
+            ->first();
+
         $credentialChanged = isset($updates['username']) || isset($updates['password']);
 
         if ($credentialChanged) {
@@ -292,12 +298,6 @@ class UserManagementController extends Controller
             (new SnipeItService())->forceRelogin($updatedUser->username);
             (new TicketService())->forceLogout($id);
         }
-
-        // Ambil data user terbaru setelah update
-        $updatedUser = DB::connection('pilargroup')
-            ->table('central_users')
-            ->where('id', $id)
-            ->first();
 
         // Sync ke SnipeIt (sudah ada, kondisinya kita relax jadi selalu sync kalau ada perubahan)
         if (isset($updates['username']) || isset($updates['name']) || isset($updates['email'])) {
