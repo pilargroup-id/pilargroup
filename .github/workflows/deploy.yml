@@ -48,7 +48,6 @@ jobs:
       # -------------------------
       - name: Pull latest code on VM
         run: |
-          ssh -vvv -i ~/.ssh/deploy_key ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "echo connected"
           ssh -i ~/.ssh/deploy_key ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "
             set -e
             cd /var/www/pilargroup
