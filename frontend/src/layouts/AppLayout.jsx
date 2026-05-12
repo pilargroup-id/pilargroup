@@ -163,7 +163,7 @@ function AppLayout({
         <Header
           {...headerProps}
           directoryProps={{
-            rootLabel: headerProps.title ?? 'Pilargroupp',
+            rootLabel: headerProps.title ?? 'Pilargroup',
             currentLabel: activePageLabel,
           }}
           onRefresh={handleRefresh}
