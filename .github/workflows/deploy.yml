@@ -48,7 +48,7 @@ jobs:
       # -------------------------
       - name: Pull latest code on VM
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "
             set -e
             cd /var/www/pilargroup
             echo '>> Git pull'
