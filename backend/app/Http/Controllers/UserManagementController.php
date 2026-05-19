@@ -56,19 +56,14 @@ class UserManagementController extends Controller
     }
 
     // ─────────────────────────────────────────────
-    // HELPER: sync pivot departments + auto-derive companies
+    // HELPER: sync pivot departments + companies
     // Dipakai di store & update supaya DRY
     // ─────────────────────────────────────────────
-    private function syncUserDepartments(string $userId, array $departments, string $now): void
+    private function syncUserDepartments(string $userId, array $departments, ?array $companies, string $now): void
     {
         // Hapus pivot lama
         DB::connection('pilargroup')
             ->table('central_user_departments')
-            ->where('user_id', $userId)
-            ->delete();
-
-        DB::connection('pilargroup')
-            ->table('central_user_companies')
             ->where('user_id', $userId)
             ->delete();
 
@@ -89,23 +84,52 @@ class UserManagementController extends Controller
             ]);
         }
 
-        // Auto-derive companies dari departments yang dipilih (unique)
-        $companyIds = DB::connection('pilargroup')
-            ->table('master_departments')
-            ->whereIn('id', collect($departments)->pluck('id')->toArray())
-            ->whereNotNull('company_id')
-            ->distinct()
-            ->pluck('company_id');
+        $shouldAutoDerive = is_null($companies) || (is_array($companies) && count($companies) === 0);
 
-        foreach ($companyIds as $i => $companyId) {
-            DB::connection('pilargroup')->table('central_user_companies')->insert([
-                'id'         => Str::uuid()->toString(),
-                'user_id'    => $userId,
-                'company_id' => $companyId,
-                'is_primary' => $i === 0 ? 1 : 0,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+        if (!$shouldAutoDerive) {
+            DB::connection('pilargroup')
+                ->table('central_user_companies')
+                ->where('user_id', $userId)
+                ->delete();
+
+            $uniqueCompanies = collect($companies)->unique('id')->values()->all();
+
+            foreach ($uniqueCompanies as $i => $company) {
+                $isPrimary = !empty($company['is_primary']) ? 1 : ($i === 0 ? 1 : 0);
+
+                DB::connection('pilargroup')->table('central_user_companies')->insert([
+                    'id'         => Str::uuid()->toString(),
+                    'user_id'    => $userId,
+                    'company_id' => $company['id'],
+                    'is_primary' => $isPrimary,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        } else {
+            DB::connection('pilargroup')
+                ->table('central_user_companies')
+                ->where('user_id', $userId)
+                ->delete();
+
+            // Auto-derive companies dari departments yang dipilih (unique)
+            $companyIds = DB::connection('pilargroup')
+                ->table('master_departments')
+                ->whereIn('id', collect($departments)->pluck('id')->toArray())
+                ->whereNotNull('company_id')
+                ->distinct()
+                ->pluck('company_id');
+
+            foreach ($companyIds as $i => $companyId) {
+                DB::connection('pilargroup')->table('central_user_companies')->insert([
+                    'id'         => Str::uuid()->toString(),
+                    'user_id'    => $userId,
+                    'company_id' => $companyId,
+                    'is_primary' => $i === 0 ? 1 : 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
         }
     }
 
@@ -199,6 +223,9 @@ class UserManagementController extends Controller
             'departments'          => 'required|array|min:1',
             'departments.*.id'     => 'required|integer|exists:pilargroup.master_departments,id',
             'departments.*.is_primary' => 'nullable|boolean',
+            'companies'            => 'nullable|array',
+            'companies.*.id'       => 'required_with:companies|string|exists:pilargroup.master_companies,id',
+            'companies.*.is_primary' => 'nullable|boolean',
             'apps'                 => 'required|array',
             'apps.*'               => 'string|exists:pilargroup.master_projects,slug',
         ]);
@@ -246,8 +273,8 @@ class UserManagementController extends Controller
                     'updated_at'   => $now,
                 ]);
 
-                // 2. Sync pivot departments + auto-derive companies
-                $this->syncUserDepartments($userId, $request->input('departments'), $now);
+                // 2. Sync pivot departments + companies
+                $this->syncUserDepartments($userId, $request->input('departments'), $request->input('companies'), $now);
 
                 // 3. Insert project access
                 $projectIds = DB::connection('pilargroup')
@@ -332,6 +359,9 @@ class UserManagementController extends Controller
             'departments'          => 'nullable|array|min:1',
             'departments.*.id'     => 'required_with:departments|integer|exists:pilargroup.master_departments,id',
             'departments.*.is_primary' => 'nullable|boolean',
+            'companies'            => 'nullable|array',
+            'companies.*.id'       => 'required_with:companies|string|exists:pilargroup.master_companies,id',
+            'companies.*.is_primary' => 'nullable|boolean',
             'apps'                 => 'nullable|array',
             'apps.*'               => 'string|exists:pilargroup.master_projects,slug',
         ]);
@@ -394,9 +424,22 @@ class UserManagementController extends Controller
             // Update central_users
             DB::connection('pilargroup')->table('central_users')->where('id', $id)->update($updates);
 
-            // Update pivot departments (kalau dikirim)
-            if ($request->has('departments') && is_array($request->input('departments'))) {
-                $this->syncUserDepartments($id, $request->input('departments'), $now);
+            // Update pivot departments & companies (kalau dikirim)
+            if ($request->has('departments') || $request->has('companies')) {
+                $departments = $request->input('departments');
+                if (!$request->has('departments')) {
+                    $departments = DB::connection('pilargroup')
+                        ->table('central_user_departments')
+                        ->where('user_id', $id)
+                        ->select('department_id as id', 'is_primary')
+                        ->get()
+                        ->map(fn($d) => ['id' => $d->id, 'is_primary' => $d->is_primary])
+                        ->toArray();
+                }
+
+                $companies = $request->has('companies') ? $request->input('companies') : null;
+
+                $this->syncUserDepartments($id, $departments, $companies, $now);
             }
 
             // Update project access (kalau dikirim)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import api from '@/services/api'
 import {
   CheckCircle,
   Edit03,
@@ -35,6 +36,7 @@ function getCreateFormState() {
     url: '',
     description: '',
     isActive: 'active',
+    company_id: '',
   }
 }
 
@@ -75,17 +77,27 @@ function buildCreateProjectPayload(formValues) {
     url: formValues.url.trim() || null,
     description: formValues.description.trim(),
     is_active: formValues.isActive === 'active' ? 1 : 0,
+    company_id: formValues.company_id || null,
   }
 }
 
 function ProjectCreatePopup({ isOpen, isSubmitting, errorMessage, onClose, onSubmit }) {
   const [formValues, setFormValues] = useState(getCreateFormState)
+  const [companies, setCompanies] = useState([])
 
   useEffect(() => {
     if (!isOpen) {
       setFormValues(getCreateFormState())
       return undefined
     }
+
+    api
+      .request('/master/companies')
+      .then((data) => {
+        const companyList = Array.isArray(data) ? data : data?.data || []
+        setCompanies(companyList)
+      })
+      .catch((error) => console.error('Failed to load companies:', error))
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape' && !isSubmitting) {
@@ -244,6 +256,23 @@ function ProjectCreatePopup({ isOpen, isSubmitting, errorMessage, onClose, onSub
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
+                </select>
+              </label>
+
+              <label className="register-user-popup__field">
+                <span className="register-user-popup__label">Company</span>
+                <select
+                  className="register-user-popup__select"
+                  name="company_id"
+                  value={formValues.company_id}
+                  onChange={handleChange}
+                >
+                  <option value="">Pilih Company</option>
+                  {companies.map((company) => (
+                    <option key={company.id || company.code} value={company.id || company.code}>
+                      {company.name}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>

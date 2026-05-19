@@ -57,6 +57,70 @@ function renderAppsForTable(apps) {
   )
 }
 
+function formatDepartmentsForTable(division) {
+  if (!division) {
+    return []
+  }
+
+  return division
+    .split(',')
+    .map((dept) => String(dept).trim())
+    .filter((dept) => dept && dept !== '-')
+}
+
+function renderDepartmentsForTable(division) {
+  const deptList = formatDepartmentsForTable(division)
+
+  if (deptList.length === 0) {
+    return <span className="users-table__apps-empty">-</span>
+  }
+
+  return (
+    <div className="users-table__apps">
+      {deptList.map((dept, index) => (
+        <span
+          key={`${dept}-${index}`}
+          className="users-table__status users-table__status--inline users-table__status--dept"
+        >
+          {dept}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function formatCompaniesForTable(company) {
+  if (!company) {
+    return []
+  }
+
+  return company
+    .split(',')
+    .map((c) => String(c).trim())
+    .filter((c) => c && c !== '-')
+}
+
+function renderCompaniesForTable(company) {
+  const companyList = formatCompaniesForTable(company)
+
+  if (companyList.length === 0) {
+    return <span className="users-table__apps-empty">-</span>
+  }
+
+  return (
+    <div className="users-table__apps">
+      {companyList.map((c, index) => (
+        <span
+          key={`${c}-${index}`}
+          className="users-table__status users-table__status--inline users-table__status--company"
+        >
+          {c}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function renderDetailValue(value) {
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -110,18 +174,36 @@ function getDetailSections(user) {
     {
       title: 'Organization',
       fields: [
-        { label: 'companies', value: getDetailValue(user.company) },
+        {
+          label: 'companies',
+          value: getDetailValue(
+            Array.isArray(rawUser.companies) && rawUser.companies.length > 0
+              ? rawUser.companies.map((c) => c.name || c.code).filter(Boolean)
+              : null
+          ),
+        },
         {
           label: 'department_id',
-          value: getDetailValue(rawUser.department_id ?? rawUser.departmentId),
+          value: getDetailValue(
+            rawUser.department_id ?? 
+            rawUser.departmentId ?? 
+            (Array.isArray(rawUser.departments) && rawUser.departments.length > 0 ? rawUser.departments.map(d => d.id).join(', ') : null)
+          ),
         },
         {
           label: 'department',
+          value: getDetailValue(user.division),
+        },
+        {
+          label: 'department_class',
+          value: getDetailValue(user.departmentClass),
+        },
+        {
+          label: 'departments',
           value: getDetailValue(
-            rawUser.department ??
-              rawUser.department_name ??
-              rawUser.departmentName ??
-              user.division,
+            Array.isArray(rawUser.departments) && rawUser.departments.length > 0
+              ? rawUser.departments.map((d) => d.name)
+              : null
           ),
         },
         {
@@ -207,7 +289,7 @@ function TableUser({
           <thead>
             <tr>
               <th scope="col">User</th>
-              <th scope="col">Departement</th>
+              <th scope="col">Departments</th>
               <th scope="col">Role</th>
               <th scope="col">Company</th>
               <th scope="col">Apps</th>
@@ -253,9 +335,9 @@ function TableUser({
                           </div>
                         </div>
                       </td>
-                      <td>{user.division}</td>
+                      <td>{renderDepartmentsForTable(user.division)}</td>
                       <td>{user.role}</td>
-                      <td>{user.company}</td>
+                      <td>{renderCompaniesForTable(user.company)}</td>
                       <td>{renderAppsForTable(user.apps)}</td>
                       <td className="users-table__detail-cell">
                         <button

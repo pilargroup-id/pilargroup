@@ -1824,6 +1824,16 @@
   color: #18786e;
 }
 
+.users-table__status--dept {
+  background: rgba(45, 74, 140, 0.12);
+  color: #2d4a8c;
+}
+
+.users-table__status--company {
+  background: rgba(157, 78, 221, 0.12);
+  color: #9d4edd;
+}
+
 .users-table__status--active {
   background: rgba(42, 157, 143, 0.14);
   color: #18786e;

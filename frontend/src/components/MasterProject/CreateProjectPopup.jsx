@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Folder, SearchMd, XClose } from '@untitledui/icons'
+import api from '@/services/api'
 
 const initialFormState = {
   name: '',
@@ -7,6 +8,7 @@ const initialFormState = {
   url: '',
   status: 'Active',
   description: '',
+  company: '',
   divisions: [],
   userIds: [],
 }
@@ -28,6 +30,7 @@ function CreateProjectPopup({
 }) {
   const [formState, setFormState] = useState(initialFormState)
   const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [companies, setCompanies] = useState([])
 
   useEffect(() => {
     if (!isOpen) {
@@ -51,6 +54,14 @@ function CreateProjectPopup({
     if (isOpen) {
       setFormState(initialFormState)
       setUserSearchQuery('')
+
+      api
+        .request('/master/companies')
+        .then((data) => {
+          const companyList = Array.isArray(data) ? data : data?.data || []
+          setCompanies(companyList)
+        })
+        .catch((error) => console.error('Failed to load companies:', error))
     }
   }, [isOpen])
 
@@ -74,6 +85,7 @@ function CreateProjectPopup({
       description:
         formState.description.trim() ||
         'Project baru untuk mendukung kebutuhan operasional lintas divisi.',
+      company: formState.company,
       divisions,
       users: selectedUsers,
     })
@@ -190,6 +202,27 @@ function CreateProjectPopup({
                       <option value="Active">Active</option>
                       <option value="Review">Review</option>
                       <option value="Draft">Draft</option>
+                    </select>
+                  </label>
+
+                  <label className="register-user-popup__field">
+                    <span className="register-user-popup__label">Company</span>
+                    <select
+                      className="register-user-popup__select"
+                      value={formState.company}
+                      onChange={(event) =>
+                        setFormState((current) => ({
+                          ...current,
+                          company: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Pilih Company</option>
+                      {companies.map((company) => (
+                        <option key={company.code} value={company.code}>
+                          {company.name}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>

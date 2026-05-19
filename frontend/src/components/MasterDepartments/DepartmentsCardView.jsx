@@ -24,10 +24,6 @@ function getEditPayload(formValues) {
   }
 }
 
-// function getDepartmentDescription(department) {
-//   return `Department ${department.name} tersedia untuk pemetaan user melalui field department_id.`
-// }
-
 function DepartmentsCardView({ activePath = '/master-departments' }) {
   usePageTitle()
 

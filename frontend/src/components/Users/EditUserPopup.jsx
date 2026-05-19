@@ -4,6 +4,7 @@ import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
 import { getJobLevels } from '@/services/master/getJobLevels'
 import { normalizePhoneNumber } from '@/utils/normalizePhoneNumber'
+import api from '@/services/api'
 import {
   normalizeManagedUserApps,
   resolveManagedUserApps,
@@ -22,6 +23,7 @@ const initialFormState = {
   job_level_id: '',
   internal_id: '',
   is_active: 'true',
+  company_ids: [],
   apps: [],
 }
 
@@ -86,11 +88,18 @@ function getEditFormState(user) {
     name: getTextValue(rawUser.name),
     email: getTextValue(rawUser.email),
     phone: normalizePhoneNumber(rawUser.phone),
-    department_id: getTextValue(rawUser.department_id ?? rawUser.departmentId),
+    department_id: getTextValue(
+      rawUser.department_id ?? 
+      rawUser.departmentId ?? 
+      (Array.isArray(rawUser.departments) && rawUser.departments.length > 0 ? rawUser.departments[0].id : '')
+    ),
     job_position: getTextValue(rawUser.job_position ?? rawUser.jobPosition),
     job_level_id: getTextValue(rawUser.job_level_id ?? rawUser.jobLevelId),
     internal_id: getTextValue(rawUser.internal_id ?? rawUser.internalId),
     is_active: getBooleanSelectValue(rawUser.is_active ?? rawUser.isActive ?? user?.statusKey),
+    company_ids: Array.isArray(rawUser.companies)
+      ? rawUser.companies.map((c) => String(c.id))
+      : [],
     apps: userApps,
   }
 }
@@ -100,20 +109,26 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
   const [departments, setDepartments] = useState([])
   const [projects, setProjects] = useState([])
   const [jobLevels, setJobLevels] = useState([])
+  const [companies, setCompanies] = useState([])
   const [appsDropdownOpen, setAppsDropdownOpen] = useState(false)
+  const [companiesDropdownOpen, setCompaniesDropdownOpen] = useState(false)
   const appsListId = 'edit-user-popup-apps-list'
+  const companiesListId = 'edit-user-popup-companies-list'
 
   useEffect(() => {
     if (!user) {
       setFormValues(initialFormState)
       setDepartments([])
       setProjects([])
+      setCompanies([])
       setAppsDropdownOpen(false)
+      setCompaniesDropdownOpen(false)
       return undefined
     }
 
     setFormValues(getEditFormState(user))
     setAppsDropdownOpen(false)
+    setCompaniesDropdownOpen(false)
   }, [user])
 
   useEffect(() => {
@@ -123,6 +138,8 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape' && !isSubmitting) {
+        setCompaniesDropdownOpen(false)
+        setAppsDropdownOpen(false)
         onClose?.()
       }
     }
@@ -143,10 +160,11 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
     const fetchData = async () => {
       try {
-        const [depts, projs, jls] = await Promise.all([
+        const [depts, projs, jls, comps] = await Promise.all([
             getDepartments(),
             getProjects(),
             getJobLevels(),
+            api.request('/master/companies').then((data) => (Array.isArray(data) ? data : data?.data || [])).catch(() => []),
         ])
 
         if (!isActive) {
@@ -156,6 +174,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
         setDepartments(depts)
         setProjects(projs)
         setJobLevels(jls)
+        setCompanies(comps)
         setFormValues((currentValues) => {
           const resolvedApps = resolveManagedUserApps(currentValues.apps, projs)
 
@@ -199,6 +218,28 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     }))
   }
 
+  const handleCompaniesChange = (event) => {
+    const { value, checked } = event.target
+
+    setFormValues((currentValues) => {
+      if (checked) {
+        if (currentValues.company_ids.includes(value)) {
+          return currentValues
+        }
+
+        return {
+          ...currentValues,
+          company_ids: [...currentValues.company_ids, value],
+        }
+      }
+
+      return {
+        ...currentValues,
+        company_ids: currentValues.company_ids.filter((id) => id !== value),
+      }
+    })
+  }
+
   const handleAppsChange = (event) => {
     const { value, checked } = event.target
 
@@ -227,6 +268,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     }
 
     setAppsDropdownOpen(false)
+    setCompaniesDropdownOpen(false)
     onClose?.()
   }
 
@@ -283,7 +325,13 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
             <div className="register-user-popup__layout">
               <div className="register-user-popup__main">
-                <div className="register-user-popup__grid">
+                <div 
+                  className="register-user-popup__grid"
+                  style={{
+                    paddingBottom: (companiesDropdownOpen) ? '220px' : '0px',
+                    transition: 'padding-bottom 0.2s ease'
+                  }}
+                >
                   <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Username</span>
                     <input
@@ -354,6 +402,114 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
                       pattern="[0-9]*"
                     />
                   </label>
+
+                  <div className="register-user-popup__field" aria-labelledby={companiesListId}>
+                    <span className="register-user-popup__label" id={companiesListId}>Company</span>
+                    
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        className="register-user-popup__input"
+                        onClick={() => setCompaniesDropdownOpen((current) => !current)}
+                        aria-expanded={companiesDropdownOpen}
+                        aria-controls="edit-user-popup-companies-options"
+                        style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          width: '100%', 
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          backgroundColor: 'var(--bg-primary, #ffffff)'
+                        }}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {formValues.company_ids.length === 0
+                            ? 'Pilih Company'
+                            : `${formValues.company_ids.length} Company dipilih`}
+                        </span>
+                        <svg
+                          className={`register-user-popup__dropdown-icon ${companiesDropdownOpen ? 'open' : ''}`}
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          style={{ flexShrink: 0, marginLeft: '8px', color: '#64748b' }}
+                        >
+                          <path
+                            d="M4 6L8 10L12 6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+
+                      {companiesDropdownOpen && (
+                        <div
+                          className="register-user-popup__apps-list"
+                          id="edit-user-popup-companies-options"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            zIndex: 50,
+                            marginTop: '4px',
+                            background: 'var(--bg-primary, #ffffff)',
+                            border: '1px solid var(--border-primary, #e2e8f0)',
+                            borderRadius: '8px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '4px'
+                          }}
+                        >
+                          {companies.length === 0 ? (
+                            <div className="register-user-popup__no-options" style={{ padding: '8px 12px' }}>
+                              Tidak ada company tersedia
+                            </div>
+                          ) : (
+                            companies.map((company) => {
+                              const companyId = String(company.id || company.code)
+                              const isSelected = formValues.company_ids.includes(companyId)
+
+                              return (
+                                <div
+                                  key={companyId}
+                                  onClick={() => handleCompaniesChange({ target: { value: companyId, checked: !isSelected } })}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                    margin: 0,
+                                    padding: '8px 12px',
+                                    boxSizing: 'border-box',
+                                    cursor: 'pointer',
+                                    backgroundColor: isSelected ? '#f8fafc' : 'transparent',
+                                    borderBottom: '1px solid #f1f5f9'
+                                  }}
+                                >
+                                  <span style={{ fontSize: '14px', color: isSelected ? '#0f172a' : '#334155', fontWeight: isSelected ? '500' : '400' }}>
+                                    {company.name}
+                                  </span>
+                                  {isSelected && (
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, color: '#10b981' }}>
+                                      <path d="M13.3334 4L6.00008 11.3333L2.66675 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Divisi</span>

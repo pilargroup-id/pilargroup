@@ -41,6 +41,7 @@ Route::prefix('master')
 
         Route::get('/departments', [MasterController::class, 'getDepartments']);
         Route::get('/projects', [MasterController::class, 'getProjects']);
+        Route::get('/companies', [MasterController::class, 'getCompanies']);
 
         // CRUD master - IT only
         Route::middleware('it.only')->group(function () {

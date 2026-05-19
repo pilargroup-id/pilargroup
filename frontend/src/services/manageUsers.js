@@ -275,15 +275,30 @@ export function normalizeManagedUser(rawUser = {}) {
       rawUser.name ?? rawUser.full_name ?? rawUser.fullName ?? rawUser.username,
     ),
     email: normalizeText(rawUser.email),
-    division: normalizeText(
-      rawUser.department ??
-        rawUser.department_name ??
-        rawUser.departmentName ??
-        rawUser.division,
-    ),
+    division: (() => {
+      const depts = Array.isArray(rawUser.departments) ? rawUser.departments : (Array.isArray(rawUser.department) ? rawUser.department : null);
+      if (depts && depts.length > 0) {
+        const names = depts.map((d) => d.name).filter(Boolean).join(', ');
+        if (names) return names;
+      }
+      return normalizeText(
+        rawUser.department ??
+          rawUser.department_name ??
+          rawUser.departmentName ??
+          rawUser.division,
+      );
+    })(),
+    departmentClass: (() => {
+      const depts = Array.isArray(rawUser.departments) ? rawUser.departments : (Array.isArray(rawUser.department) ? rawUser.department : null);
+      if (depts && depts.length > 0) {
+        const classes = depts.map((d) => d.class).filter(Boolean).join(', ');
+        if (classes) return classes;
+      }
+      return '-';
+    })(),
     role: normalizeRole(rawUser),
     company: Array.isArray(rawUser.companies) && rawUser.companies.length > 0
-      ? rawUser.companies.map((c) => c.name || c.code).filter(Boolean).join(', ')
+      ? rawUser.companies.map((c) => c.code || c.name).filter(Boolean).join(', ')
       : '-',
     status: normalizedStatus.label,
     statusKey: normalizedStatus.key,

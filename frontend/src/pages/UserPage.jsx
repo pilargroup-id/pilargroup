@@ -75,7 +75,11 @@ function buildUpdateUserPayload(formValues) {
 
   const departmentId = Number(formValues.department_id)
   if (Number.isInteger(departmentId) && departmentId > 0) {
-    payload.department_id = departmentId
+    payload.departments = [{ id: departmentId }]
+  }
+
+  if (Array.isArray(formValues.company_ids)) {
+    payload.companies = formValues.company_ids.map(id => ({ id }))
   }
 
   const internalIdValue = formValues.internal_id.trim()
