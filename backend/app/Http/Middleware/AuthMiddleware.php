@@ -18,12 +18,15 @@ class AuthMiddleware
 
             // Tidak perlu cek apps, cukup token valid
             $request->merge([
-                'auth_user'    => $payload->toArray(),
-                'user_id'      => $payload->get('sub'),
+                'auth_user'     => $payload->toArray(),
+                'user_id'       => $payload->get('sub'),
                 'auth_username' => $payload->get('username'),
                 'auth_name'     => $payload->get('name'),
-                'department'   => $payload->get('department'),
-                'auth_apps'    => $payload->get('apps') ?? [],
+                'department'    => $payload->get('department'),
+                'department_id' => $payload->get('department_id'),
+                'company'       => $payload->get('company'),
+                'company_id'    => $payload->get('company_id'),
+                'auth_apps'     => $payload->get('apps') ?? [],
                 'auth_cv'       => $payload->get('cv'),
             ]);
 

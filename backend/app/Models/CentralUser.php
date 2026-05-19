@@ -11,7 +11,6 @@ class CentralUser extends Authenticatable implements JWTSubject
     protected $table = 'central_users';
     protected $hidden = ['password'];
 
-    // TAMBAH INI
     protected $primaryKey = 'id';
     public $incrementing = false;
     protected $keyType = 'string';
@@ -29,9 +28,7 @@ class CentralUser extends Authenticatable implements JWTSubject
             'name'         => $this->name,
             'email'        => $this->email,
             'phone'        => $this->phone,
-            'department'   => $this->department,
             'job_position' => $this->job_position,
-            'job_level'    => $this->job_level,
             'apps'         => $this->apps ?? [],
         ];
     }

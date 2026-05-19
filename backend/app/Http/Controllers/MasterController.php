@@ -10,19 +10,52 @@ class MasterController extends Controller
 {
     // ===== DEPARTMENTS =====
 
-    public function getDepartments()
+    public function getDepartments(Request $request)
     {
-        $departments = DB::connection('pilargroup')
-            ->table('master_departments')
-            ->orderBy('name')
-            ->get();
-        return response()->json($departments);
+        $query = DB::connection('pilargroup')
+            ->table('master_departments as md')
+            ->leftJoin('master_companies as mc', 'md.company_id', '=', 'mc.id')
+            ->leftJoin('master_departments as parent', 'md.parent_id', '=', 'parent.id')
+            ->select(
+                'md.id',
+                'md.name',
+                'md.class',
+                'md.code',
+                'md.company_id',
+                'mc.name as company_name',
+                'mc.code as company_code',
+                'md.parent_id',
+                'parent.name as parent_name',
+                'md.is_active',
+                'md.created_at',
+                'md.updated_at'
+            )
+            ->orderBy('md.company_id')
+            ->orderBy('md.parent_id')
+            ->orderBy('md.name');
+
+        // Optional filter by company
+        if ($request->filled('company_id')) {
+            $query->where('md.company_id', $request->input('company_id'));
+        }
+
+        // Optional: hanya parent departments (tanpa sub)
+        if ($request->boolean('root_only')) {
+            $query->whereNull('md.parent_id');
+        }
+
+        return response()->json($query->get());
     }
 
     public function storeDepartment(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|unique:pilargroup.master_departments,name',
+            'name'       => 'required|string|max:100',
+            'class'      => 'nullable|string|max:100',
+            'code'       => 'required|string|max:10',
+            'company_id' => 'required|string|exists:pilargroup.master_companies,id',
+            'parent_id'  => 'nullable|integer|exists:pilargroup.master_departments,id',
+            'is_active'  => 'nullable|boolean',
         ]);
 
         $maxId = DB::connection('pilargroup')
@@ -34,13 +67,19 @@ class MasterController extends Controller
         DB::connection('pilargroup')
             ->table('master_departments')
             ->insert([
-                'id'   => $newId,
-                'name' => $request->input('name'),
+                'id'         => $newId,
+                'name'       => $request->input('name'),
+                'class'      => $request->input('class', $request->input('name')),
+                'code'       => strtoupper($request->input('code')),
+                'company_id' => $request->input('company_id'),
+                'parent_id'  => $request->input('parent_id'),
+                'is_active'  => (int) $request->input('is_active', 1),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
         return response()->json([
-            'id' => $newId,
-            'name' => $request->input('name'),
+            'id'      => $newId,
             'message' => 'Department created'
         ], 201);
     }
@@ -48,21 +87,56 @@ class MasterController extends Controller
     public function updateDepartment(Request $request, $id)
     {
         $request->validate([
-            'name' => 'required|string|unique:pilargroup.master_departments,name,' . $id,
+            'name'       => 'nullable|string|max:100',
+            'class'      => 'nullable|string|max:100',
+            'code'       => 'nullable|string|max:10',
+            'company_id' => 'nullable|string|exists:pilargroup.master_companies,id',
+            'parent_id'  => 'nullable|integer|exists:pilargroup.master_departments,id',
+            'is_active'  => 'nullable|boolean',
         ]);
+
+        $dept = DB::connection('pilargroup')
+            ->table('master_departments')
+            ->where('id', $id)
+            ->first();
+
+        if (!$dept) {
+            return response()->json(['message' => 'Department not found'], 404);
+        }
+
+        // Cegah parent_id nunjuk ke dirinya sendiri
+        if ($request->filled('parent_id') && (int)$request->input('parent_id') === (int)$id) {
+            return response()->json(['message' => 'Department tidak bisa jadi parent dirinya sendiri'], 422);
+        }
+
+        $updates = ['updated_at' => now()];
+        if ($request->filled('name'))       $updates['name']       = $request->input('name');
+        if ($request->filled('class'))      $updates['class']      = $request->input('class');
+        if ($request->filled('code'))       $updates['code']       = strtoupper($request->input('code'));
+        if ($request->filled('company_id')) $updates['company_id'] = $request->input('company_id');
+        if ($request->has('parent_id'))     $updates['parent_id']  = $request->input('parent_id'); // bisa null
+        if ($request->has('is_active'))     $updates['is_active']  = (int) $request->input('is_active');
 
         DB::connection('pilargroup')
             ->table('master_departments')
             ->where('id', $id)
-            ->update(['name' => $request->input('name')]);
+            ->update($updates);
 
         return response()->json(['message' => 'Department updated']);
     }
 
     public function deleteDepartment($id)
     {
+        $dept = DB::connection('pilargroup')
+            ->table('master_departments')->where('id', $id)->first();
+
+        if (!$dept) {
+            return response()->json(['message' => 'Department not found'], 404);
+        }
+
+        // Cek apakah masih ada user di dept ini
         $inUse = DB::connection('pilargroup')
-            ->table('central_users')
+            ->table('central_user_departments')
             ->where('department_id', $id)
             ->exists();
 
@@ -70,10 +144,17 @@ class MasterController extends Controller
             return response()->json(['message' => 'Department masih digunakan oleh user'], 422);
         }
 
-        DB::connection('pilargroup')
+        // Cek apakah ada sub-departments
+        $hasSubs = DB::connection('pilargroup')
             ->table('master_departments')
-            ->where('id', $id)
-            ->delete();
+            ->where('parent_id', $id)
+            ->exists();
+
+        if ($hasSubs) {
+            return response()->json(['message' => 'Department masih punya sub-department, hapus sub-department dulu'], 422);
+        }
+
+        DB::connection('pilargroup')->table('master_departments')->where('id', $id)->delete();
 
         return response()->json(['message' => 'Department deleted']);
     }
@@ -316,6 +397,90 @@ class MasterController extends Controller
             ->delete();
 
         return response()->json(['message' => 'Job level deleted successfully']);
+    }
+
+    // ===== COMPANIES =====
+
+    public function getCompanies()
+    {
+        $companies = DB::connection('pilargroup')
+            ->table('master_companies')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($companies);
+    }
+
+    public function storeCompany(Request $request)
+    {
+        $request->validate([
+            'code'      => 'required|string|max:10|unique:pilargroup.master_companies,code',
+            'name'      => 'required|string|max:150',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $id = Str::uuid()->toString();
+
+        DB::connection('pilargroup')
+            ->table('master_companies')
+            ->insert([
+                'id'         => $id,
+                'code'       => strtoupper($request->input('code')),
+                'name'       => $request->input('name'),
+                'is_active'  => (int) $request->input('is_active', 1),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json(['id' => $id, 'message' => 'Company created'], 201);
+    }
+
+    public function updateCompany(Request $request, $id)
+    {
+        $company = DB::connection('pilargroup')
+            ->table('master_companies')->where('id', $id)->first();
+
+        if (!$company) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $request->validate([
+            'code'      => 'nullable|string|max:10|unique:pilargroup.master_companies,code,' . $id . ',id',
+            'name'      => 'nullable|string|max:150',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $updates = ['updated_at' => now()];
+        if ($request->filled('code'))   $updates['code']      = strtoupper($request->input('code'));
+        if ($request->filled('name'))   $updates['name']      = $request->input('name');
+        if ($request->has('is_active')) $updates['is_active'] = (int) $request->input('is_active');
+
+        DB::connection('pilargroup')->table('master_companies')->where('id', $id)->update($updates);
+
+        return response()->json(['message' => 'Company updated']);
+    }
+
+    public function deleteCompany($id)
+    {
+        $company = DB::connection('pilargroup')
+            ->table('master_companies')->where('id', $id)->first();
+
+        if (!$company) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $hasDepts = DB::connection('pilargroup')
+            ->table('master_departments')
+            ->where('company_id', $id)
+            ->exists();
+
+        if ($hasDepts) {
+            return response()->json(['message' => 'Company masih punya department, pindahkan atau hapus department dulu'], 422);
+        }
+
+        DB::connection('pilargroup')->table('master_companies')->where('id', $id)->delete();
+
+        return response()->json(['message' => 'Company deleted']);
     }
     
 }

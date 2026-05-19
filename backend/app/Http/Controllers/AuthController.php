@@ -27,7 +27,6 @@ class AuthController extends Controller
     {
         $userProfile = DB::connection('pilargroup')
             ->table('central_users as cu')
-            ->leftJoin('master_departments as md', 'cu.department_id', '=', 'md.id')
             ->leftJoin('master_job_levels as mjl', 'cu.job_level_id', '=', 'mjl.id')
             ->select(
                 'cu.id',
@@ -36,8 +35,6 @@ class AuthController extends Controller
                 'cu.name',
                 'cu.email',
                 'cu.phone',
-                'cu.department_id',
-                'md.name as department',
                 'cu.job_position',
                 'cu.job_level_id',
                 'mjl.name as job_level',
@@ -47,21 +44,48 @@ class AuthController extends Controller
             ->where('cu.id', $user->id)
             ->first();
 
+        // Multi-department
+        $departments = DB::connection('pilargroup')
+            ->table('central_user_departments as cud')
+            ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
+            ->where('cud.user_id', $user->id)
+            ->select('md.id', 'md.name', 'md.class', 'md.code', 'cud.is_primary')
+            ->get()
+            ->toArray();
+
+        // Multi-company
+        $companies = DB::connection('pilargroup')
+            ->table('central_user_companies as cuc')
+            ->join('master_companies as mc', 'cuc.company_id', '=', 'mc.id')
+            ->where('cuc.user_id', $user->id)
+            ->select('mc.id', 'mc.code', 'mc.name', 'cuc.is_primary')
+            ->get()
+            ->toArray();
+
         $apps = $this->getUserApps($user->id);
 
+        // Primary department & company untuk backward-compat di JWT claim
+        $primaryDept    = collect($departments)->firstWhere('is_primary', 1) ?? ($departments[0] ?? null);
+        $primaryCompany = collect($companies)->firstWhere('is_primary', 1)   ?? ($companies[0] ?? null);
+
         return [
-            'id'            => $userProfile?->id ?? $user->id,
-            'internal_id'   => $userProfile?->internal_id ?? $user->internal_id,
-            'username'      => $userProfile?->username ?? $user->username,
-            'name'          => $userProfile?->name ?? $user->name,
-            'email'         => $userProfile?->email ?? $user->email,
-            'phone'         => $userProfile?->phone ?? $user->phone,
-            'department_id' => $userProfile?->department_id ?? $user->department_id ?? null,
-            'department'    => $userProfile?->department ?? null,
-            'job_position'  => $userProfile?->job_position ?? $user->job_position,
-            'job_level'     => $userProfile?->job_level ?? $user->job_level,
+            'id'            => $userProfile?->id            ?? $user->id,
+            'internal_id'   => $userProfile?->internal_id   ?? $user->internal_id,
+            'username'      => $userProfile?->username       ?? $user->username,
+            'name'          => $userProfile?->name           ?? $user->name,
+            'email'         => $userProfile?->email          ?? $user->email,
+            'phone'         => $userProfile?->phone          ?? $user->phone,
+            'departments'   => $departments,
+            'companies'     => $companies,
+            'department_id' => $primaryDept?->id   ?? null,
+            'department'    => $primaryDept?->name ?? null,
+            'company_id'    => $primaryCompany?->id   ?? null,
+            'company'       => $primaryCompany?->name ?? null,
+            'job_position'  => $userProfile?->job_position   ?? $user->job_position,
+            'job_level'     => $userProfile?->job_level      ?? null,
+            'job_level_value' => $userProfile?->job_level_value ?? null,
             'apps'          => $apps,
-            'cv'            => $userProfile?->token_version ?? $user->token_version,
+            'cv'            => $userProfile?->token_version  ?? $user->token_version,
         ];
     }
 
@@ -108,9 +132,11 @@ class AuthController extends Controller
 
         $token = JWTAuth::claims([
             'department_id' => $authUser['department_id'],
-            'department' => $authUser['department'],
-            'apps' => $authUser['apps'],
-            'cv' => $user->token_version,
+            'department'    => $authUser['department'],
+            'company_id'    => $authUser['company_id'],
+            'company'       => $authUser['company'],
+            'apps'          => $authUser['apps'],
+            'cv'            => $user->token_version,
         ])->fromUser($user);
 
         return response()->json([

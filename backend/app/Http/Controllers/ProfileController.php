@@ -10,6 +10,22 @@ use App\Services\SnipeItService;
 
 class ProfileController extends Controller
 {
+    // ─────────────────────────────────────────────
+    // HELPER: ambil primary department name dari pivot
+    // ─────────────────────────────────────────────
+    private function getPrimaryDepartmentName(string $userId): ?string
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_departments as cud')
+            ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
+            ->where('cud.user_id', $userId)
+            ->orderByRaw('cud.is_primary DESC')
+            ->value('md.name');
+    }
+
+    // ─────────────────────────────────────────────
+    // PUT /api/auth/change-profile
+    // ─────────────────────────────────────────────
     public function changeProfile(Request $request)
     {
         $request->validate([
@@ -20,10 +36,11 @@ class ProfileController extends Controller
             'phone'            => 'nullable|string|max:20',
         ]);
 
-        if (!$request->new_username && !$request->new_password && !$request->email && !$request->phone) {
+        if (!$request->new_username && !$request->new_password
+            && $request->input('email') === null && $request->input('phone') === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Isi minimal new_username atau new_password atau email atau phone untuk mengubah profile',
+                'message' => 'Isi minimal new_username, new_password, email, atau phone untuk mengubah profile',
             ], 422);
         }
 
@@ -43,10 +60,11 @@ class ProfileController extends Controller
             return response()->json(['success' => false, 'message' => 'Password saat ini salah'], 401);
         }
 
-        $updates = ['updated_at' => now()->toDateTimeString()];
-        $changed = [];
+        $oldUsername = $user->username;
+        $updates     = ['updated_at' => now()->toDateTimeString()];
+        $changed     = [];
 
-        if ($request->new_username) {
+        if ($request->filled('new_username')) {
             $exists = DB::connection('pilargroup')
                 ->table('central_users')
                 ->where('username', $request->new_username)
@@ -61,20 +79,33 @@ class ProfileController extends Controller
             $changed[] = 'username';
         }
 
-        if ($request->new_password) {
+        if ($request->filled('new_password')) {
             $updates['password'] = Hash::make($request->new_password);
             $changed[] = 'password';
         }
 
-        if ($request->input('email') !== null) { $updates['email'] = $request->input('email'); $changed[] = 'email'; }
-        if ($request->input('phone') !== null) { $updates['phone'] = $request->input('phone'); $changed[] = 'phone'; }
+        if ($request->input('email') !== null) {
+            $updates['email'] = $request->input('email');
+            $changed[] = 'email';
+        }
 
-        $oldUsername = $user->username;
+        if ($request->input('phone') !== null) {
+            $updates['phone'] = $request->input('phone');
+            $changed[] = 'phone';
+        }
 
+        // Update central_users
         DB::connection('pilargroup')
             ->table('central_users')
             ->where('id', $userId)
             ->update($updates);
+
+        // Ambil data terbaru setelah update
+        // PENTING: harus setelah update(), bukan sebelum
+        $updatedUser = DB::connection('pilargroup')
+            ->table('central_users')
+            ->where('id', $userId)
+            ->first();
 
         $credentialChanged = in_array('username', $changed) || in_array('password', $changed);
 
@@ -84,17 +115,12 @@ class ProfileController extends Controller
                 ->where('id', $userId)
                 ->increment('token_version');
 
+            // forceRelogin pakai username terbaru (sudah terupdate di DB)
             (new SnipeItService())->forceRelogin($updatedUser->username);
             (new TicketService())->forceLogout($userId);
         }
 
-        // Ambil data user terbaru setelah update
-        $updatedUser = DB::connection('pilargroup')
-            ->table('central_users')
-            ->where('id', $userId)
-            ->first();
-
-        // Cek apakah user punya akses ticket
+        // Ambil apps user
         $userApps = DB::connection('pilargroup')
             ->table('central_user_projects as cup')
             ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
@@ -102,37 +128,24 @@ class ProfileController extends Controller
             ->pluck('mp.slug')
             ->toArray();
 
-        if (in_array('ticket', $userApps)) {
-            $department = null;
-            if ($updatedUser->department_id) {
-                $department = DB::connection('pilargroup')
-                    ->table('master_departments')
-                    ->where('id', $updatedUser->department_id)
-                    ->value('name');
-            }
+        // Primary department dari pivot (bukan department_id di central_users)
+        $deptName = $this->getPrimaryDepartmentName($userId);
 
-            (new TicketService())->syncUser($updatedUser, $department, $oldUsername);
+        // Sync Ticket kalau user punya akses
+        if (in_array('ticket', $userApps)) {
+            (new TicketService())->syncUser($updatedUser, $deptName, $oldUsername);
         }
 
-        
-            $snipeDept = null;
-            if ($updatedUser->department_id) {
-                $snipeDept = DB::connection('pilargroup')
-                    ->table('master_departments')
-                    ->where('id', $updatedUser->department_id)
-                    ->value('name');
-            }
+        // Sync SnipeIt — job level
+        $snipeJobLevel = null;
+        if ($updatedUser->job_level_id) {
+            $snipeJobLevel = DB::connection('pilargroup')
+                ->table('master_job_levels')
+                ->where('id', $updatedUser->job_level_id)
+                ->value('name');
+        }
 
-            $snipeJobLevel = null;
-            if ($updatedUser->job_level_id) {
-                $snipeJobLevel = DB::connection('pilargroup')
-                    ->table('master_job_levels')
-                    ->where('id', $updatedUser->job_level_id)
-                    ->value('name');
-            }
-
-            (new \App\Services\SnipeItService())->syncUser($updatedUser, $snipeDept, $snipeJobLevel, $oldUsername);
-        
+        (new SnipeItService())->syncUser($updatedUser, $deptName, $snipeJobLevel, $oldUsername);
 
         return response()->json([
             'success' => true,

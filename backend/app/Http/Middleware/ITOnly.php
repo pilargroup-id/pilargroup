@@ -4,22 +4,23 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ITOnly
 {
-    protected array $itDepartmentAliases = [
-        'it',
-        'information technology',
-        'department it',
-        'departement it',
-        'it department',
-    ];
-
     public function handle(Request $request, Closure $next)
     {
-        $department = strtolower(trim((string) $request->department));
+        $userId = $request->user_id;
 
-        if (!in_array($department, $this->itDepartmentAliases, true)) {
+        // Cek apakah user punya salah satu department dengan code 'SIT' (IT)
+        $isIT = DB::connection('pilargroup')
+            ->table('central_user_departments as cud')
+            ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
+            ->where('cud.user_id', $userId)
+            ->where('md.code', 'SIT')
+            ->exists();
+
+        if (!$isIT) {
             return response()->json(['message' => 'Access denied. IT division only.'], 403);
         }
 
