@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
 
 function getEditFormState(department) {
+  const companyName = department?.companyName
   return {
     name: department?.name ?? '',
+    companyName: companyName && companyName !== '-' ? companyName : '',
   }
 }
 
@@ -112,6 +114,20 @@ function EditDepartmentPopup({
                   value={formValues.name}
                   onChange={handleChange}
                   placeholder="Masukkan nama department"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+
+              <label className="register-user-popup__field">
+                <span className="register-user-popup__label">Company</span>
+                <input
+                  className="register-user-popup__input"
+                  type="text"
+                  name="companyName"
+                  value={formValues.companyName}
+                  onChange={handleChange}
+                  placeholder="Masukkan nama perusahaan"
                   autoComplete="off"
                   required
                 />

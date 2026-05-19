@@ -282,6 +282,9 @@ export function normalizeManagedUser(rawUser = {}) {
         rawUser.division,
     ),
     role: normalizeRole(rawUser),
+    company: Array.isArray(rawUser.companies) && rawUser.companies.length > 0
+      ? rawUser.companies.map((c) => c.name || c.code).filter(Boolean).join(', ')
+      : '-',
     status: normalizedStatus.label,
     statusKey: normalizedStatus.key,
     apps: normalizeManagedUserApps(rawUser.apps),

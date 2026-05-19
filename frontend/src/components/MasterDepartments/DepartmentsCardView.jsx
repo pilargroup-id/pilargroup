@@ -20,6 +20,7 @@ import CreateDepartmentPopup from './CreateDepartmentPopup'
 function getEditPayload(formValues) {
   return {
     name: formValues.name.trim(),
+    company_name: formValues.companyName?.trim() || '',
   }
 }
 
@@ -251,7 +252,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
 
             <div className="master-project-card__metrics">
               <span className="master-project-card__metric">
-                Department ID {department.id}
+                {department.companyName}
               </span>
               <span className="master-project-card__metric">
                 {department.updatedAt !== '-'

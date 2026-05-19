@@ -110,6 +110,7 @@ function getDetailSections(user) {
     {
       title: 'Organization',
       fields: [
+        { label: 'companies', value: getDetailValue(user.company) },
         {
           label: 'department_id',
           value: getDetailValue(rawUser.department_id ?? rawUser.departmentId),
@@ -208,6 +209,7 @@ function TableUser({
               <th scope="col">User</th>
               <th scope="col">Departement</th>
               <th scope="col">Role</th>
+              <th scope="col">Company</th>
               <th scope="col">Apps</th>
               <th scope="col" className="users-table__detail-header">
                 Detail
@@ -253,6 +255,7 @@ function TableUser({
                       </td>
                       <td>{user.division}</td>
                       <td>{user.role}</td>
+                      <td>{user.company}</td>
                       <td>{renderAppsForTable(user.apps)}</td>
                       <td className="users-table__detail-cell">
                         <button
@@ -280,7 +283,7 @@ function TableUser({
 
                     {isExpanded ? (
                       <tr className="users-table__accordion-row">
-                        <td colSpan="5">
+                        <td colSpan="6">
                           <div className="users-table__accordion" id={accordionId}>
                             <div className="users-table__accordion-header">
                               <div className="users-table__accordion-copy">
@@ -352,7 +355,7 @@ function TableUser({
               })
             ) : (
               <tr>
-                <td colSpan="5">
+                <td colSpan="6">
                   <div className="users-table__empty">{tableMessage}</div>
                 </td>
               </tr>

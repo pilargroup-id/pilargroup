@@ -248,13 +248,13 @@ function UserPage() {
   }
 
   const filteredUsers = userList.filter((user) => {
-    const { id, name, email, division, role, status } = user
+    const { id, name, email, division, role, company, status } = user
 
     if (!normalizedSearchQuery) {
       return true
     }
 
-    return [id, name, email, division, role, status].some((field) =>
+    return [id, name, email, division, role, company, status].some((field) =>
       field.toLowerCase().includes(normalizedSearchQuery),
     )
   })

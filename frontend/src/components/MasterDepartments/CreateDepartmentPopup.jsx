@@ -4,6 +4,7 @@ import { XClose } from '@untitledui/icons'
 function getCreateFormState() {
   return {
     name: '',
+    companyName: '',
   }
 }
 
@@ -114,6 +115,20 @@ function CreateDepartmentPopup({
                   value={formValues.name}
                   onChange={handleChange}
                   placeholder="Masukkan nama department"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+
+              <label className="register-user-popup__field register-user-popup__field--full">
+                <span className="register-user-popup__label">Company</span>
+                <input
+                  className="register-user-popup__input"
+                  type="text"
+                  name="companyName"
+                  value={formValues.companyName}
+                  onChange={handleChange}
+                  placeholder="Masukkan nama perusahaan"
                   autoComplete="off"
                   required
                 />

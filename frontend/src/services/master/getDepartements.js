@@ -107,6 +107,7 @@ export function normalizeDepartment(rawDepartment = {}) {
       rawDepartment.name ?? rawDepartment.department ?? rawDepartment.department_name,
       'Untitled Department',
     ),
+    companyName: normalizeText(rawDepartment.company_name, '-'),
     updatedAt: formatTimestamp(rawDepartment.updated_at ?? rawDepartment.updatedAt),
     createdAt: formatTimestamp(rawDepartment.created_at ?? rawDepartment.createdAt),
     raw: rawDepartment,
