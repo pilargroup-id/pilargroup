@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CircleCut, XClose } from '@untitledui/icons'
 
 import { ApiError, changeProfile, getCurrentUser } from '@/services/api'
@@ -137,7 +138,7 @@ function ChangeProfilePopup({ isOpen = false, user, onClose, onUpdated }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup"
@@ -358,7 +359,7 @@ function ChangeProfilePopup({ isOpen = false, user, onClose, onUpdated }) {
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default ChangeProfilePopup

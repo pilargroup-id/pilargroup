@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
+import { createPortal } from 'react-dom'
 import api from '@/services/api'
 
 function getEditFormState(department) {
@@ -83,7 +84,7 @@ function EditDepartmentPopup({
     }
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup"
@@ -196,7 +197,7 @@ function EditDepartmentPopup({
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default EditDepartmentPopup

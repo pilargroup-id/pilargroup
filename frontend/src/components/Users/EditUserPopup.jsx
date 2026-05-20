@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
@@ -282,7 +283,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     })
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup register-user-popup--users"
@@ -694,7 +695,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default EditUserPopup

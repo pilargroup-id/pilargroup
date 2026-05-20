@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
 import api from '@/services/api'
 
@@ -86,7 +87,7 @@ function CreateDepartmentPopup({
     }
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup"
@@ -199,7 +200,7 @@ function CreateDepartmentPopup({
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default CreateDepartmentPopup

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
@@ -258,7 +259,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     return null
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup register-user-popup--users"
@@ -780,7 +781,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default RegisterUserPopup
