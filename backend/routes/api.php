@@ -57,6 +57,10 @@ Route::prefix('master')
             Route::post('/job-levels', [MasterController::class, 'storeJobLevel']);
             Route::put('/job-levels/{id}', [MasterController::class, 'updateJobLevel']);
             Route::delete('/job-levels/{id}', [MasterController::class, 'destroyJobLevel']);
+
+            Route::post('/companies', [MasterController::class, 'storeCompany']);
+            Route::put('/companies/{id}', [MasterController::class, 'updateCompany']);
+            Route::delete('/companies/{id}', [MasterController::class, 'deleteCompany']);
         });
     });
 

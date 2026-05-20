@@ -49,6 +49,8 @@ class MasterController extends Controller
 
     public function storeDepartment(Request $request)
     {
+        \Log::info('storeDepartment Payload:', $request->all());
+
         $request->validate([
             'name'       => 'required|string|max:100',
             'class'      => 'nullable|string|max:100',
