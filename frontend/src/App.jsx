@@ -19,6 +19,8 @@ const routes = {
   '/users': UserPage,
 }
 
+const JWT_APPS = ['ticket', 'treeview', 'touchpoint', 'framelens', 'billforge']
+
 async function handleSsoAuthorizeIfNeeded() {
   if (!isAuthenticated()) return false
 
@@ -29,6 +31,8 @@ async function handleSsoAuthorizeIfNeeded() {
   const ssoState     = params.get('state')
 
   if (!ssoAuthorize || !clientId || !redirectUri || !ssoState) return false
+
+  if (JWT_APPS.includes(clientId)) return false
 
   try {
     const token = getToken()
