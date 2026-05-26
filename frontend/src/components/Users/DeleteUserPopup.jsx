@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
 
 function DeleteUserPopup({ user, isSubmitting, errorMessage, onClose, onConfirm }) {
@@ -34,7 +35,7 @@ function DeleteUserPopup({ user, isSubmitting, errorMessage, onClose, onConfirm 
     }
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup master-departments-delete-popup"
@@ -97,7 +98,7 @@ function DeleteUserPopup({ user, isSubmitting, errorMessage, onClose, onConfirm 
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default DeleteUserPopup

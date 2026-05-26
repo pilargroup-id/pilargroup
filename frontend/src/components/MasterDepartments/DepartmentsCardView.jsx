@@ -18,9 +18,11 @@ import EditDepartmentPopup from './EditDepartmentPopup'
 import CreateDepartmentPopup from './CreateDepartmentPopup'
 
 function getEditPayload(formValues) {
+  console.log('Building payload from formValues:', formValues)
   return {
-    name: formValues.name.trim(),
-    company_name: formValues.companyName?.trim() || '',
+    name: formValues.name?.trim() || '',
+    code: formValues.code?.trim() || '',
+    company_id: formValues.companyId?.trim() || '',
   }
 }
 
@@ -133,9 +135,11 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
     setIsSavingDepartment(true)
 
     try {
+      const payload = getEditPayload(formValues)
+      console.log('Submitting edit department payload:', payload)
       await updateDepartment(
         editingDepartment.departmentId,
-        getEditPayload(formValues),
+        payload,
       )
       notifyDepartmentCatalogUpdated()
       setFeedbackMessage({
@@ -185,7 +189,9 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
     setIsCreatingDepartment(true)
 
     try {
-      await createDepartment(getEditPayload(formValues))
+      const payload = getEditPayload(formValues)
+      console.log('Submitting create department payload:', payload)
+      await createDepartment(payload)
       notifyDepartmentCatalogUpdated()
       setFeedbackMessage({
         type: 'success',

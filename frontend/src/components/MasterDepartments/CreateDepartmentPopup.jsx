@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
+import api from '@/services/api'
 
 function getCreateFormState() {
   return {
     name: '',
-    companyName: '',
+    code: '',
+    companyId: '',
   }
 }
 
@@ -16,10 +19,28 @@ function CreateDepartmentPopup({
   onSubmit,
 }) {
   const [formValues, setFormValues] = useState(() => getCreateFormState())
+  const [companies, setCompanies] = useState([])
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setFormValues(getCreateFormState())
+
+      const fetchCompanies = async () => {
+        setIsLoadingCompanies(true)
+        try {
+          const res = await api.request('/master/companies')
+          const data = Array.isArray(res) ? res : (res?.data || [])
+          console.log('Fetched companies:', data)
+          setCompanies(data)
+        } catch (error) {
+          console.error('Failed to load companies:', error)
+        } finally {
+          setIsLoadingCompanies(false)
+        }
+      }
+
+      void fetchCompanies()
     }
   }, [isOpen])
 
@@ -47,6 +68,7 @@ function CreateDepartmentPopup({
 
   const handleChange = (event) => {
     const { name, value } = event.target
+    console.log('handleChange:', name, value)
 
     setFormValues((currentValues) => ({
       ...currentValues,
@@ -65,7 +87,7 @@ function CreateDepartmentPopup({
     }
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup"
@@ -106,7 +128,7 @@ function CreateDepartmentPopup({
             ) : null}
 
             <div className="register-user-popup__grid">
-              <label className="register-user-popup__field register-user-popup__field--full">
+              <label className="register-user-popup__field">
                 <span className="register-user-popup__label">Nama Department</span>
                 <input
                   className="register-user-popup__input"
@@ -120,18 +142,40 @@ function CreateDepartmentPopup({
                 />
               </label>
 
-              <label className="register-user-popup__field register-user-popup__field--full">
-                <span className="register-user-popup__label">Company</span>
+              <label className="register-user-popup__field">
+                <span className="register-user-popup__label">Kode Department</span>
                 <input
                   className="register-user-popup__input"
                   type="text"
-                  name="companyName"
-                  value={formValues.companyName}
+                  name="code"
+                  value={formValues.code}
                   onChange={handleChange}
-                  placeholder="Masukkan nama perusahaan"
+                  placeholder="Masukkan kode (maks 10 karakter)"
                   autoComplete="off"
+                  maxLength={10}
                   required
                 />
+              </label>
+
+              <label className="register-user-popup__field register-user-popup__field--full">
+                <span className="register-user-popup__label">Company</span>
+                <select
+                  className="register-user-popup__input"
+                  name="companyId"
+                  value={formValues.companyId}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoadingCompanies}
+                >
+                  <option value="" disabled>
+                    {isLoadingCompanies ? 'Loading companies...' : 'Pilih perusahaan'}
+                  </option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </div>
@@ -156,7 +200,7 @@ function CreateDepartmentPopup({
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default CreateDepartmentPopup

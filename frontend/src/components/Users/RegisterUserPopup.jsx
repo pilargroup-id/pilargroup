@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XClose } from '@untitledui/icons'
 import { getDepartments } from '@/services/master/getDepartements'
 import { getProjects } from '@/services/master/getProjects'
@@ -52,21 +53,65 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
   const [companiesDropdownOpen, setCompaniesDropdownOpen] = useState(false)
   const [departmentsDropdownOpen, setDepartmentsDropdownOpen] = useState(false)
   const [departmentsSearch, setDepartmentsSearch] = useState('')
+  const [classSearch, setClassSearch] = useState('')
+  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
+  const [selectedGroups, setSelectedGroups] = useState([])
+  const [showPassword, setShowPassword] = useState(false)
+  const [tabValue, setTabValue] = useState(0)
   const appsListId = 'register-user-popup-apps-list'
   const companiesListId = 'register-user-popup-companies-list'
   const departmentsListId = 'register-user-popup-departments-list'
+  const classListId = 'register-user-popup-class-list'
   const visibleProjects = getSelectableProjects(projects)
 
-  const filteredDepartments = departments.filter((dept) => 
-    dept.name.toLowerCase().includes(departmentsSearch.toLowerCase())
-  )
+  const departmentGroups = departments.reduce((acc, dept) => {
+    const groupName = dept.raw?.parent_name || dept.raw?.name || dept.name;
+    if (!acc[groupName]) {
+      acc[groupName] = [];
+    }
+    acc[groupName].push(dept);
+    return acc;
+  }, {});
+
+  const groupNames = Object.keys(departmentGroups).sort();
+  const filteredGroups = groupNames.filter((name) =>
+    name.toLowerCase().includes(departmentsSearch.toLowerCase())
+  );
+
+  const availableClasses = selectedGroups.reduce((acc, groupName) => {
+    if (departmentGroups[groupName]) {
+      acc.push(...departmentGroups[groupName]);
+    }
+    return acc;
+  }, []);
+
+  const filteredClasses = availableClasses.filter((dept) => {
+    const className = dept.raw?.class || dept.class || 'Umum';
+    return className.toLowerCase().includes(classSearch.toLowerCase());
+  });
+
+  const handleGroupToggle = (groupName, isSelected) => {
+    if (!isSelected) {
+      setSelectedGroups(prev => [...prev, groupName]);
+    } else {
+      setSelectedGroups(prev => prev.filter(g => g !== groupName));
+      const classesToRemove = departmentGroups[groupName]?.map(d => String(d.id)) || [];
+      setFormValues(prev => ({
+        ...prev,
+        department_ids: prev.department_ids.filter(id => !classesToRemove.includes(id))
+      }));
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
       setAppsDropdownOpen(false)
       setCompaniesDropdownOpen(false)
       setDepartmentsDropdownOpen(false)
+      setClassDropdownOpen(false)
       setDepartmentsSearch('')
+      setClassSearch('')
+      setSelectedGroups([])
       return undefined
     }
 
@@ -77,7 +122,11 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         setAppsDropdownOpen(false)
         setCompaniesDropdownOpen(false)
         setDepartmentsDropdownOpen(false)
+        setClassDropdownOpen(false)
         setDepartmentsSearch('')
+        setClassSearch('')
+        setSelectedGroups([])
+        setTabValue(0)
         onClose?.()
       }
     }
@@ -195,7 +244,11 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     setAppsDropdownOpen(false)
     setCompaniesDropdownOpen(false)
     setDepartmentsDropdownOpen(false)
+    setClassDropdownOpen(false)
     setDepartmentsSearch('')
+    setClassSearch('')
+    setSelectedGroups([])
+    setTabValue(0)
     onClose?.()
   }
 
@@ -210,7 +263,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
     // Validasi department_ids
     if (!formValues.department_ids || formValues.department_ids.length === 0) {
-      setError('Divisi wajib dipilih minimal satu.')
+      setError('Class wajib dipilih minimal satu.')
       setLoading(false)
       return
     }
@@ -240,7 +293,11 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
       setAppsDropdownOpen(false)
       setCompaniesDropdownOpen(false)
       setDepartmentsDropdownOpen(false)
+      setClassDropdownOpen(false)
       setDepartmentsSearch('')
+      setClassSearch('')
+      setSelectedGroups([])
+      setTabValue(0)
       submittedSuccessfully = true
     } catch (err) {
       setError(err.message || 'Failed to register user')
@@ -257,7 +314,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     return null
   }
 
-  return (
+  return createPortal(
     <div className="dashboard-popup-overlay" role="presentation" onClick={handleClose}>
       <div
         className="dashboard-popup register-user-popup register-user-popup--users"
@@ -287,26 +344,63 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
         <form className="register-user-popup__form" onSubmit={handleSubmit}>
           <div className="dashboard-popup__body">
-            <p className="dashboard-popup__text" id="register-user-popup-description">
-              Lengkapi data berikut untuk menambahkan user baru ke direktori.
-            </p>
-
             {error && (
               <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
                 {error}
               </div>
             )}
 
-            <div className="register-user-popup__layout">
+            <div className="register-user-popup__layout" style={{ display: 'block' }}>
               <div className="register-user-popup__main">
+                <div style={{ borderBottom: '1px solid #e2e8f0', display: 'flex', marginBottom: '1.5rem' }}>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '12px 24px',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: tabValue === 0 ? '2px solid var(--theme-blue-primary, #1f4e8c)' : '2px solid transparent',
+                      color: tabValue === 0 ? 'var(--theme-blue-primary, #1f4e8c)' : '#64748b',
+                      fontWeight: tabValue === 0 ? '600' : '500',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => setTabValue(0)}
+                  >
+                    Informasi Akun
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '12px 24px',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: tabValue === 1 ? '2px solid var(--theme-blue-primary, #1f4e8c)' : '2px solid transparent',
+                      color: tabValue === 1 ? 'var(--theme-blue-primary, #1f4e8c)' : '#64748b',
+                      fontWeight: tabValue === 1 ? '600' : '500',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => setTabValue(1)}
+                  >
+                    Organisasi & Jabatan
+                  </button>
+                </div>
+
                 <div 
-                  className="register-user-popup__grid"
                   style={{
-                    paddingBottom: (departmentsDropdownOpen || companiesDropdownOpen) ? '220px' : '0px',
-                    transition: 'padding-bottom 0.2s ease'
+                    display: 'block',
+                    paddingBottom: (departmentsDropdownOpen || classDropdownOpen || companiesDropdownOpen) ? '220px' : '0px',
+                    transition: 'padding-bottom 0.2s ease',
                   }}
                 >
-                  <label className="register-user-popup__field">
+                  <div hidden={tabValue !== 0}>
+                    <div className="register-user-popup__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                    <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Username</span>
                     <input
                       className="register-user-popup__input"
@@ -322,16 +416,48 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
                   <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Password</span>
-                    <input
-                      className="register-user-popup__input"
-                      type="password"
-                      name="password"
-                      value={formValues.password}
-                      onChange={handleChange}
-                      placeholder="Masukkan password"
-                      autoComplete="new-password"
-                      required
-                    />
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        className="register-user-popup__input"
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formValues.password}
+                        onChange={handleChange}
+                        placeholder="Masukkan password"
+                        autoComplete="new-password"
+                        style={{ width: '100%', paddingRight: '40px' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          color: '#64748b'
+                        }}
+                        aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                      >
+                        {showPassword ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </label>
 
                   <label className="register-user-popup__field">
@@ -375,6 +501,23 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       pattern="[0-9]*"
                     />
                   </label>
+
+                  <label className="register-user-popup__field">
+                    <span className="register-user-popup__label">Internal ID</span>
+                    <input
+                      className="register-user-popup__input"
+                      type="number"
+                      name="internal_id"
+                      value={formValues.internal_id}
+                      onChange={handleChange}
+                      placeholder="Masukkan ID internal user"
+                    />
+                  </label>
+                  </div>
+                  </div>
+
+                  <div hidden={tabValue !== 1}>
+                  <div className="register-user-popup__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
 
                   <div className="register-user-popup__field" aria-labelledby={companiesListId}>
                     <span className="register-user-popup__label" id={companiesListId}>Company</span>
@@ -482,6 +625,29 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                         </div>
                       )}
                     </div>
+                    {formValues.company_ids.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: '8px' }}>
+                        {formValues.company_ids.map(id => {
+                          const comp = companies.find(c => String(c.id || c.code) === String(id));
+                          return (
+                            <span key={id} style={{
+                              display: 'inline-flex', alignItems: 'center', background: '#f1f5f9', 
+                              border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', 
+                              fontSize: '12px', color: '#334155', marginRight: '6px', marginBottom: '6px'
+                            }}>
+                              {comp ? comp.name : id}
+                              <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); handleCompaniesChange({ target: { value: id, checked: false } }); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '4px', padding: 0, color: '#64748b', display: 'flex', alignItems: 'center' }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                              </button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="register-user-popup__field" aria-labelledby={departmentsListId}>
@@ -492,7 +658,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                         <input
                           type="text"
                           className="register-user-popup__input"
-                          placeholder={formValues.department_ids.length === 0 ? "Cari divisi..." : `${formValues.department_ids.length} Divisi dipilih`}
+                          placeholder={selectedGroups.length === 0 ? "Cari divisi..." : `${selectedGroups.length} Divisi dipilih`}
                           value={departmentsSearch}
                           onChange={(e) => {
                             setDepartmentsSearch(e.target.value)
@@ -548,15 +714,160 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                             padding: '4px'
                           }}
                         >
-                          {filteredDepartments.length === 0 ? (
+                          {filteredGroups.length === 0 ? (
                             <div className="register-user-popup__no-options" style={{ padding: '8px 12px' }}>
                               Divisi tidak ditemukan
                             </div>
                           ) : (
                             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
-                              {filteredDepartments.map((dept) => {
+                              {filteredGroups.map((groupName) => {
+                                const isSelected = selectedGroups.includes(groupName);
+
+                                return (
+                                  <div
+                                    key={groupName}
+                                    onClick={() => {
+                                      handleGroupToggle(groupName, isSelected);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      width: '100%',
+                                      margin: 0,
+                                      padding: '8px 12px',
+                                      boxSizing: 'border-box',
+                                      cursor: 'pointer',
+                                      backgroundColor: isSelected ? '#f8fafc' : 'transparent',
+                                      borderBottom: '1px solid #f1f5f9'
+                                    }}
+                                  >
+                                    <span style={{ 
+                                      fontSize: '14px', 
+                                      color: isSelected ? '#0f172a' : '#334155', 
+                                      fontWeight: isSelected ? '500' : '400',
+                                      whiteSpace: 'normal',
+                                      wordBreak: 'break-word',
+                                      lineHeight: '1.4',
+                                      paddingRight: '8px'
+                                    }}>
+                                      {groupName}
+                                    </span>
+                                    {isSelected && (
+                                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, color: '#10b981' }}>
+                                        <path d="M13.3334 4L6.00008 11.3333L2.66675 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {selectedGroups.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: '8px' }}>
+                        {selectedGroups.map(groupName => (
+                          <span key={groupName} style={{
+                            display: 'inline-flex', alignItems: 'center', background: '#f1f5f9', 
+                            border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', 
+                            fontSize: '12px', color: '#334155', marginRight: '6px', marginBottom: '6px'
+                          }}>
+                            {groupName}
+                            <button 
+                              type="button" 
+                              onClick={(e) => { e.stopPropagation(); handleGroupToggle(groupName, true); }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '4px', padding: 0, color: '#64748b', display: 'flex', alignItems: 'center' }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="register-user-popup__field" aria-labelledby={classListId}>
+                    <span className="register-user-popup__label" id={classListId}>Class</span>
+                    
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="register-user-popup__input"
+                          placeholder={selectedGroups.length === 0 ? "Pilih divisi terlebih dahulu" : (formValues.department_ids.length === 0 ? "Cari class..." : `${formValues.department_ids.length} Class dipilih`)}
+                          value={classSearch}
+                          onChange={(e) => {
+                            setClassSearch(e.target.value)
+                            if(!classDropdownOpen) setClassDropdownOpen(true)
+                          }}
+                          onFocus={() => {
+                            if (selectedGroups.length > 0) setClassDropdownOpen(true)
+                          }}
+                          disabled={selectedGroups.length === 0}
+                          aria-expanded={classDropdownOpen}
+                          aria-controls="register-user-popup-class-options"
+                          style={{ 
+                            width: '100%', 
+                            paddingRight: '32px',
+                            backgroundColor: selectedGroups.length === 0 ? '#f1f5f9' : 'var(--bg-primary, #ffffff)',
+                            cursor: selectedGroups.length === 0 ? 'not-allowed' : 'text'
+                          }}
+                        />
+                        <svg
+                          className={`register-user-popup__dropdown-icon ${classDropdownOpen ? 'open' : ''}`}
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          onClick={() => {
+                            if (selectedGroups.length > 0) setClassDropdownOpen((cur) => !cur)
+                          }}
+                          style={{ position: 'absolute', right: '12px', color: '#64748b', cursor: selectedGroups.length > 0 ? 'pointer' : 'not-allowed', zIndex: 1 }}
+                        >
+                          <path
+                            d="M4 6L8 10L12 6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+
+                      {classDropdownOpen && selectedGroups.length > 0 && (
+                        <div
+                          className="register-user-popup__apps-list"
+                          id="register-user-popup-class-options"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            minWidth: '100%',
+                            zIndex: 60,
+                            marginTop: '4px',
+                            background: 'var(--bg-primary, #ffffff)',
+                            border: '1px solid var(--border-primary, #e2e8f0)',
+                            borderRadius: '8px',
+                            maxHeight: '250px',
+                            overflowY: 'hidden',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '4px'
+                          }}
+                        >
+                          {filteredClasses.length === 0 ? (
+                            <div className="register-user-popup__no-options" style={{ padding: '8px 12px' }}>
+                              Class tidak ditemukan
+                            </div>
+                          ) : (
+                            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                              {filteredClasses.map((dept) => {
                                 const deptId = String(dept.id)
                                 const isSelected = formValues.department_ids.includes(deptId)
+                                const classNameDisplay = dept.raw?.class || dept.class || 'Umum'
 
                                 return (
                                   <div
@@ -584,7 +895,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                                       lineHeight: '1.4',
                                       paddingRight: '8px'
                                     }}>
-                                      {dept.name}
+                                      {classNameDisplay}
                                     </span>
                                     {isSelected && (
                                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, color: '#10b981' }}>
@@ -599,6 +910,30 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                         </div>
                       )}
                     </div>
+                    {formValues.department_ids.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: '8px' }}>
+                        {formValues.department_ids.map(id => {
+                          const dept = departments.find(d => String(d.id) === String(id));
+                          const classNameDisplay = dept?.raw?.class || dept?.class || 'Umum';
+                          return (
+                            <span key={id} style={{
+                              display: 'inline-flex', alignItems: 'center', background: '#f1f5f9', 
+                              border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', 
+                              fontSize: '12px', color: '#334155', marginRight: '6px', marginBottom: '6px'
+                            }}>
+                              {classNameDisplay}
+                              <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); handleDepartmentsChange({ target: { value: id, checked: false } }); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '4px', padding: 0, color: '#64748b', display: 'flex', alignItems: 'center' }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                              </button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <label className="register-user-popup__field">
@@ -630,99 +965,60 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                       ))}
                     </select>
                   </label>
-
-                  <label className="register-user-popup__field">
-                    <span className="register-user-popup__label">Internal ID</span>
-                    <input
-                      className="register-user-popup__input"
-                      type="number"
-                      name="internal_id"
-                      value={formValues.internal_id}
-                      onChange={handleChange}
-                      placeholder="Masukkan ID internal user"
-                    />
-                  </label>
+                  </div>
+                  </div>
                 </div>
               </div>
 
-              <section className="register-user-popup__section" aria-labelledby={appsListId}>
-                <div className="register-user-popup__section-header">
-                  <span className="register-user-popup__label" id={appsListId}>
-                    Apps
+              <section className="register-user-popup__section" aria-labelledby={appsListId} style={{ marginTop: '2rem', width: '100%' }}>
+                <div className="register-user-popup__section-header" style={{ marginBottom: '1rem' }}>
+                  <span className="register-user-popup__label" id={appsListId} style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}>
+                    Apps <span style={{ fontWeight: 'normal', color: '#64748b' }}>
+                      ({formValues.apps.length === 0 ? 'Belum ada apps dipilih' : `${formValues.apps.length} dipilih`})
+                    </span>
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  className="register-user-popup__dropdown-button"
-                  onClick={() => setAppsDropdownOpen((current) => !current)}
-                  aria-expanded={appsDropdownOpen}
-                  aria-controls="register-user-popup-apps-options"
+                <div
+                  id="register-user-popup-apps-options"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gap: '12px',
+                    width: '100%'
+                  }}
                 >
-                  <span>
-                    {formValues.apps.length === 0
-                      ? 'Pilih Apps'
-                      : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih`}
-                  </span>
-                  <svg
-                    className={`register-user-popup__dropdown-icon ${appsDropdownOpen ? 'open' : ''}`}
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                  >
-                    <path
-                      d="M4 6L8 10L12 6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                  {visibleProjects.length === 0 ? (
+                    <div className="register-user-popup__no-options">
+                      Tidak ada apps tersedia
+                    </div>
+                  ) : (
+                    visibleProjects.map((project) => {
+                      const isSelected = formValues.apps.includes(project.slug)
 
-                <p className="register-user-popup__selection-summary">
-                  {formValues.apps.length === 0
-                    ? 'Belum ada apps dipilih.'
-                    : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih.`}
-                </p>
-
-                {appsDropdownOpen && (
-                  <div
-                    className="register-user-popup__apps-list"
-                    id="register-user-popup-apps-options"
-                  >
-                    {visibleProjects.length === 0 ? (
-                      <div className="register-user-popup__no-options">
-                        Tidak ada apps tersedia
-                      </div>
-                    ) : (
-                      visibleProjects.map((project) => {
-                        const isSelected = formValues.apps.includes(project.slug)
-
-                        return (
-                          <label
-                            key={project.projectId}
-                            className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="register-user-popup__apps-checkbox"
-                              name="apps"
-                              value={project.slug}
-                              checked={isSelected}
-                              onChange={handleAppsChange}
-                            />
-                            <span className="register-user-popup__apps-copy">
-                              <span>{project.name}</span>
-                              <small>{project.slug}</small>
-                            </span>
-                          </label>
-                        )
-                      })
-                    )}
-                  </div>
-                )}
+                      return (
+                        <label
+                          key={project.projectId}
+                          className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
+                          style={{ margin: 0 }}
+                        >
+                          <input
+                            type="checkbox"
+                            className="register-user-popup__apps-checkbox"
+                            name="apps"
+                            value={project.slug}
+                            checked={isSelected}
+                            onChange={handleAppsChange}
+                          />
+                          <span className="register-user-popup__apps-copy">
+                            <span>{project.name}</span>
+                            <small>{project.slug}</small>
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
               </section>
             </div>
           </div>
@@ -747,7 +1043,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default RegisterUserPopup

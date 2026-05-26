@@ -36,15 +36,11 @@ function getCreateFormState() {
     url: '',
     description: '',
     isActive: 'active',
-    company_id: '',
   }
 }
 
 function normalizeSlugInput(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '')
+  return String(value ?? '').toLowerCase()
 }
 
 function buildProjectUpdatePayload(project, formValues) {
@@ -73,31 +69,21 @@ function buildProjectUpdatePayload(project, formValues) {
 function buildCreateProjectPayload(formValues) {
   return {
     name: formValues.name.trim(),
-    slug: normalizeSlugInput(formValues.slug),
+    slug: normalizeSlugInput(formValues.slug).trim(),
     url: formValues.url.trim() || null,
     description: formValues.description.trim(),
     is_active: formValues.isActive === 'active' ? 1 : 0,
-    company_id: formValues.company_id || null,
   }
 }
 
 function ProjectCreatePopup({ isOpen, isSubmitting, errorMessage, onClose, onSubmit }) {
   const [formValues, setFormValues] = useState(getCreateFormState)
-  const [companies, setCompanies] = useState([])
 
   useEffect(() => {
     if (!isOpen) {
       setFormValues(getCreateFormState())
       return undefined
     }
-
-    api
-      .request('/master/companies')
-      .then((data) => {
-        const companyList = Array.isArray(data) ? data : data?.data || []
-        setCompanies(companyList)
-      })
-      .catch((error) => console.error('Failed to load companies:', error))
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape' && !isSubmitting) {
@@ -124,7 +110,7 @@ function ProjectCreatePopup({ isOpen, isSubmitting, errorMessage, onClose, onSub
         return {
           ...currentValues,
           name: value,
-          slug: currentValues.slug ? currentValues.slug : normalizeSlugInput(value),
+          slug: normalizeSlugInput(value),
         }
       }
 
@@ -256,23 +242,6 @@ function ProjectCreatePopup({ isOpen, isSubmitting, errorMessage, onClose, onSub
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                </select>
-              </label>
-
-              <label className="register-user-popup__field">
-                <span className="register-user-popup__label">Company</span>
-                <select
-                  className="register-user-popup__select"
-                  name="company_id"
-                  value={formValues.company_id}
-                  onChange={handleChange}
-                >
-                  <option value="">Pilih Company</option>
-                  {companies.map((company) => (
-                    <option key={company.id || company.code} value={company.id || company.code}>
-                      {company.name}
-                    </option>
-                  ))}
                 </select>
               </label>
             </div>
@@ -424,7 +393,7 @@ function ProjectsCardView({ activePath = '/master-project' }) {
 
   const handleSubmitCreate = async (formValues) => {
     const normalizedName = formValues.name.trim()
-    const normalizedSlug = normalizeSlugInput(formValues.slug)
+    const normalizedSlug = normalizeSlugInput(formValues.slug).trim()
 
     if (!normalizedName) {
       setCreateError('Nama project wajib diisi.')

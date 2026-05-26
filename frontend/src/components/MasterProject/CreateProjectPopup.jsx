@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Folder, SearchMd, XClose } from '@untitledui/icons'
 import api from '@/services/api'
 
@@ -356,7 +357,7 @@ function CreateProjectPopup({
         </form>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 export default CreateProjectPopup

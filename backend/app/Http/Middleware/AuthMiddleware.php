@@ -18,16 +18,16 @@ class AuthMiddleware
 
             // Tidak perlu cek apps, cukup token valid
             $request->merge([
-                'auth_user'     => $payload->toArray(),
-                'user_id'       => $payload->get('sub'),
-                'auth_username' => $payload->get('username'),
-                'auth_name'     => $payload->get('name'),
-                'department'    => $payload->get('department'),
-                'department_id' => $payload->get('department_id'),
-                'company'       => $payload->get('company'),
-                'company_id'    => $payload->get('company_id'),
-                'auth_apps'     => $payload->get('apps') ?? [],
-                'auth_cv'       => $payload->get('cv'),
+                'auth_user'          => $payload->toArray(),
+                'user_id'            => $payload->get('sub'),
+                'auth_username'      => $payload->get('username'),
+                'auth_name'          => $payload->get('name'),
+                'auth_department'    => $payload->get('department'),
+                'auth_department_id' => $payload->get('department_id'),
+                'auth_company'       => $payload->get('company'),
+                'auth_company_id'    => $payload->get('company_id'),
+                'auth_apps'          => $payload->get('apps') ?? [],
+                'auth_cv'            => $payload->get('cv'),
             ]);
 
         } catch (TokenExpiredException $e) {
