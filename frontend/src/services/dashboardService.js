@@ -106,7 +106,6 @@ export async function getProjectLaunchUrl(project) {
   }
 
   // Project yang pakai SSO flow (punya sso_client)
-  const SSO_PROJECTS = ['ticket'] // tambah slug lain di sini kalau nanti ada
 
 if (SSO_PROJECTS.includes(project.slug)) {
     const projectOrigin = new URL(project.urlRaw).origin
@@ -163,8 +162,6 @@ export async function launchProject(project) {
   if (isProjectLaunchInProgress) {
     return
   }
-
-  const SSO_PROJECTS = ['ticket']
 
   const token = getToken()
   if (!token) throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
