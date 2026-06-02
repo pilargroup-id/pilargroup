@@ -44,6 +44,20 @@ jobs:
           ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
 
       # -------------------------
+      # 3.5 Debug SSH connection
+      # -------------------------
+      - name: Debug SSH connection
+        run: |
+          echo ">> Check DNS"
+          nslookup ${{ secrets.GCP_HOST }}
+
+          echo ">> Check generated public key from GitHub secret"
+          ssh-keygen -y -f ~/.ssh/deploy_key
+
+          echo ">> Test SSH verbose"
+          ssh -vvv -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i ~/.ssh/deploy_key ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "whoami && hostname"
+
+      # -------------------------
       # 4. Pull latest code di VM (backend)
       # -------------------------
       - name: Pull latest code on VM
