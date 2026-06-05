@@ -11,6 +11,7 @@ class DirectoryController extends Controller
     public function users(Request $request)
     {
         $department = $request->query('department');
+        $departmentId = $request->query('department_id');
         $companyId = $request->query('company_id');
         $active = $request->query('active', 1);
         $search = $request->query('search');
@@ -47,6 +48,10 @@ class DirectoryController extends Controller
                     ->orWhere('md.class', $department)
                     ->orWhere('md.code', $department);
             });
+        }
+
+        if ($departmentId) {
+            $query->where('md.id', (int) $departmentId);
         }
 
         if ($companyId) {
