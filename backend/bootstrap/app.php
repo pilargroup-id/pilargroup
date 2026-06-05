@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.central' => \App\Http\Middleware\AuthMiddleware::class,
             'it.only'      => \App\Http\Middleware\ITOnly::class,
+            'internal.sync' => \App\Http\Middleware\VerifyInternalSyncSecret::class,
         ]);
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
     })
