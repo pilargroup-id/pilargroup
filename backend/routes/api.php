@@ -64,6 +64,7 @@ Route::prefix('master')
             Route::delete('/companies/{id}', [MasterController::class, 'deleteCompany']);
         });
     });
+    
 
 Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
     ->post('/saml/respond', function (\Illuminate\Http\Request $request) {
