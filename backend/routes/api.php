@@ -8,6 +8,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\SamlController;
 use App\Http\Controllers\SSOController;
+use App\Http\Controllers\Internal\DirectoryController;
 
 
 Route::get('/user', function (Request $request) {
@@ -63,6 +64,7 @@ Route::prefix('master')
             Route::delete('/companies/{id}', [MasterController::class, 'deleteCompany']);
         });
     });
+    
 
 Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
     ->post('/saml/respond', function (\Illuminate\Http\Request $request) {
@@ -73,6 +75,13 @@ Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
 
         return app(\App\Http\Controllers\SamlController::class)
             ->sendResponse($userId, $request->saml_token);
+    });
+
+Route::prefix('internal')
+    ->middleware('internal.sync')
+    ->group(function () {
+        Route::get('/directory/users', [DirectoryController::class, 'users']);
+        Route::get('/directory/departments', [DirectoryController::class, 'departments']);
     });
 
 Route::get('/sso/authorize', [SSOController::class, 'authorize'])
