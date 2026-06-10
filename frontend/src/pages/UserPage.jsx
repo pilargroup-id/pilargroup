@@ -71,11 +71,23 @@ function buildUpdateUserPayload(formValues) {
   payload.email        = formValues.email.trim() || null
   payload.phone        = normalizePhoneNumber(formValues.phone) || null
   payload.job_position = formValues.job_position.trim() || null
-  payload.job_level_id = formValues.job_level_id ? parseInt(formValues.job_level_id) : null  // ← fix
+  payload.job_level_id = formValues.job_level_id ? parseInt(formValues.job_level_id) : null
 
-  const departmentId = Number(formValues.department_id)
-  if (Number.isInteger(departmentId) && departmentId > 0) {
-    payload.departments = [{ id: departmentId }]
+  const departmentIds = Array.isArray(formValues.department_ids)
+    ? formValues.department_ids
+    : formValues.department_id
+      ? [formValues.department_id]
+      : []
+
+  const normalizedDepartmentIds = departmentIds
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0)
+
+  if (normalizedDepartmentIds.length > 0) {
+    payload.departments = normalizedDepartmentIds.map((id, index) => ({
+      id,
+      is_primary: index === 0,
+    }))
   }
 
   if (Array.isArray(formValues.company_ids)) {
@@ -184,8 +196,8 @@ function UserPage() {
       return
     }
 
-    if (!formValues.department_id.trim()) {
-      setEditUserError('Divisi wajib dipilih.')
+    if (!Array.isArray(formValues.department_ids) || formValues.department_ids.length === 0) {
+      setEditUserError('Class wajib dipilih minimal satu.')
       return
     }
 
