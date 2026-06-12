@@ -110,4 +110,93 @@ class DirectoryController extends Controller
             'data' => $departments,
         ]);
     }
+
+    public function businessUnits(Request $request)
+    {
+        $companyId = $request->query('company_id');
+        $active = $request->query('active', 1);
+        $search = $request->query('search');
+
+        $query = DB::connection('pilargroup')
+            ->table('master_business_units as bu')
+            ->leftJoin('master_companies as mc', 'mc.id', '=', 'bu.company_id')
+            ->select([
+                'bu.id',
+                'bu.company_id',
+                'mc.code as company_code',
+                'mc.name as company_name',
+                'bu.code',
+                'bu.name',
+                'bu.is_active',
+            ]);
+
+        if ($active !== null && $active !== 'all') {
+            $query->where('bu.is_active', (int) $active);
+        }
+
+        if ($companyId) {
+            $query->where('bu.company_id', $companyId);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('bu.code', 'like', "%{$search}%")
+                    ->orWhere('bu.name', 'like', "%{$search}%");
+            });
+        }
+
+        $businessUnits = $query
+            ->orderBy('bu.name')
+            ->get();
+
+        return response()->json([
+            'message' => 'Business units fetched successfully',
+            'data' => $businessUnits,
+        ]);
+    }
+
+    public function businessUnitDepartments(Request $request, string $id)
+    {
+        $active = $request->query('active', 1);
+        $search = $request->query('search');
+
+        $query = DB::connection('pilargroup')
+            ->table('master_business_unit_departments as bud')
+            ->join('master_business_units as bu', 'bu.id', '=', 'bud.business_unit_id')
+            ->join('master_departments as md', 'md.id', '=', 'bud.department_id')
+            ->select([
+                'bud.id',
+                'bud.business_unit_id',
+                'bu.code as business_unit_code',
+                'bu.name as business_unit_name',
+                'bud.department_id',
+                'md.code as department_code',
+                'md.name as department_name',
+                'bud.is_primary',
+                'bud.is_active',
+            ])
+            ->where('bud.business_unit_id', $id);
+
+        if ($active !== null && $active !== 'all') {
+            $query->where('bud.is_active', (int) $active);
+            $query->where('md.is_active', (int) $active);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('md.code', 'like', "%{$search}%")
+                    ->orWhere('md.name', 'like', "%{$search}%");
+            });
+        }
+
+        $departments = $query
+            ->orderByDesc('bud.is_primary')
+            ->orderBy('md.name')
+            ->get();
+
+        return response()->json([
+            'message' => 'Business unit departments fetched successfully',
+            'data' => $departments,
+        ]);
+    }
 }
