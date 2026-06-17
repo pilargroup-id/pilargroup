@@ -46,6 +46,9 @@ const handleSubmit = async (event) => {
 
     const { token, redirect } = await submitLogin(loginPayload)
 
+    console.log('Login result - token:', token, 'redirect:', redirect)
+    console.log('samlToken dari URL:', params.get('saml_token'))
+
     const params    = new URLSearchParams(window.location.search)
     const samlToken = params.get('saml_token')
 
@@ -146,6 +149,7 @@ const handleSubmit = async (event) => {
     window.dispatchEvent(new PopStateEvent('popstate'))
 
   } catch (error) {
+    console.error('Error di handleSubmit:', error)
     setErrorMessage(
       error?.message || 'Login gagal. Periksa kembali username dan password Anda.',
     )
