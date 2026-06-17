@@ -23,6 +23,17 @@ const setupChecklist = [
 
 let isProjectLaunchInProgress = false
 
+const SAML_PROJECTS = ['assetit']
+
+function isSamlProject(project) {
+  return SAML_PROJECTS.includes(String(project?.slug ?? '').toLowerCase())
+}
+
+function buildSamlLoginUrl(project) {
+  const projectOrigin = new URL(project.urlRaw).origin
+  return `${projectOrigin}/login/saml`
+}
+
 function formatCount(value) {
   return String(value).padStart(2, '0')
 }
@@ -105,52 +116,58 @@ export async function getProjectLaunchUrl(project) {
     throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
   }
 
-  // Project yang pakai SSO flow (punya sso_client)
+  if (isSamlProject(project)) {
+    return buildSamlLoginUrl(project)
+  }
+
+  // Project yang pakai SSO flow OAuth/custom flow
   const SSO_PROJECTS = [] // tambah slug lain di sini kalau nanti ada
 
-if (SSO_PROJECTS.includes(project.slug)) {
+  if (SSO_PROJECTS.includes(project.slug)) {
     const projectOrigin = new URL(project.urlRaw).origin
 
-    // Hit ticket API untuk generate state
+    // Hit project API untuk generate state
     const ssoUrlRes = await fetch(`${projectOrigin}/api/auth/sso-url`)
-    if (!ssoUrlRes.ok) throw new ApiError('Gagal generate SSO URL.')
+    if (!ssoUrlRes.ok) {
+      throw new ApiError('Gagal generate SSO URL.')
+    }
 
     const { url } = await ssoUrlRes.json()
 
-    // url sudah berisi full /sso/authorize URL dari ticket
+    // url sudah berisi full /sso/authorize URL dari project
     // Tapi kita perlu hit pilargroup /api/sso/authorize dengan token
-    // Jadi kita parse state dari url yang dikembalikan ticket
-    const ticketUrl    = new URL(url)
-    const state        = ticketUrl.searchParams.get('state')
-    const redirectUri  = ticketUrl.searchParams.get('redirect_uri')
+    // Jadi kita parse state dari url yang dikembalikan project
+    const projectSsoUrl = new URL(url)
+    const state = projectSsoUrl.searchParams.get('state')
+    const redirectUri = projectSsoUrl.searchParams.get('redirect_uri')
 
     const params = new URLSearchParams({
-        client_id:    project.slug,
-        redirect_uri: redirectUri,
-        state,
+      client_id: project.slug,
+      redirect_uri: redirectUri,
+      state,
     })
 
     const res = await fetch(`/api/sso/authorize?${params}`, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept':        'application/json',
-        },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
     })
 
     if (!res.ok) {
-        const data = await res.json()
-        throw new ApiError(data.message || 'SSO gagal.')
+      const data = await res.json()
+      throw new ApiError(data.message || 'SSO gagal.')
     }
 
     const data = await res.json()
     window.location.assign(data.redirect_url)
     return
-}
+  }
 
-  // Flow lama — project yang terima JWT langsung (treeview, touchpoint, dll)
+  // Flow lama — project yang terima JWT langsung seperti treeview, touchpoint, dll
   const launchUrl = buildProjectUrl(project.urlRaw)
-  launchUrl.searchParams.set('token',   token)
-  launchUrl.searchParams.set('source',  'dashboard-it')
+  launchUrl.searchParams.set('token', token)
+  launchUrl.searchParams.set('source', 'dashboard-it')
 
   if (project.slug && project.slug !== 'no-slug') {
     launchUrl.searchParams.set('project', project.slug)
@@ -167,11 +184,27 @@ export async function launchProject(project) {
   const SSO_PROJECTS = []
 
   const token = getToken()
-  if (!token) throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
 
-  if (!canAccessProject(project)) throw new ApiError('Anda tidak memiliki akses ke project ini.')
-  if (!project?.isActive) throw new ApiError('Project ini sedang inactive dan tidak bisa dijalankan.')
-  if (!project?.urlRaw) throw new ApiError('URL project belum tersedia.')
+  if (!token) {
+    throw new ApiError('Token login tidak ditemukan. Silakan login ulang.')
+  }
+
+  if (!canAccessProject(project)) {
+    throw new ApiError('Anda tidak memiliki akses ke project ini.')
+  }
+
+  if (!project?.isActive) {
+    throw new ApiError('Project ini sedang inactive dan tidak bisa dijalankan.')
+  }
+
+  if (!project?.urlRaw) {
+    throw new ApiError('URL project belum tersedia.')
+  }
+
+  if (isSamlProject(project)) {
+    window.location.assign(buildSamlLoginUrl(project))
+    return
+  }
 
   isProjectLaunchInProgress = true
 
@@ -181,9 +214,11 @@ export async function launchProject(project) {
     if (SSO_PROJECTS.includes(project.slug)) {
       const projectOrigin = new URL(project.urlRaw).origin
 
-      // Hit ticket untuk generate & simpan state
+      // Hit project untuk generate & simpan state
       const ssoUrlRes = await fetch(`${projectOrigin}/api/auth/sso-url`)
-      if (!ssoUrlRes.ok) throw new ApiError('Gagal generate SSO URL.')
+      if (!ssoUrlRes.ok) {
+        throw new ApiError('Gagal generate SSO URL.')
+      }
 
       const { state, redirect_uri } = await ssoUrlRes.json()
 
