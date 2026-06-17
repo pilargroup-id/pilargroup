@@ -11,7 +11,7 @@ class VerifyInternalSyncSecret
     public function handle(Request $request, Closure $next): Response
     {
         $incomingSecret = $request->header('X-Internal-Secret');
-        $validSecret = env('INTERNAL_SYNC_SECRET');
+        $validSecret = config('services.internal_secret');
 
         if (!$incomingSecret || !$validSecret || !hash_equals((string) $validSecret, (string) $incomingSecret)) {
             return response()->json([
