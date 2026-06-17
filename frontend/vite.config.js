@@ -9,53 +9,53 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      // VitePWA({
-      //   registerType: 'autoUpdate',
-      //   includeAssets: ['favicon-pwa.png', 'apple-touch-icon-pwa.png'],
-      //   manifest: {
-      //     name: 'Pilargroup Dashboard IT',
-      //     short_name: 'Pilargroup',
-      //     description: 'Internal dashboard PT. Pilar Niaga Makmur.',
-      //     lang: 'id',
-      //     theme_color: '#1f4e8c',
-      //     background_color: '#f7fbff',
-      //     display: 'standalone',
-      //     scope: '/',
-      //     start_url: '/',
-      //     icons: [
-      //       {
-      //         src: 'pwa-192x192.png',
-      //         sizes: '192x192',
-      //         type: 'image/png',
-      //         purpose: 'any',
-      //       },
-      //       {
-      //         src: 'pwa-512x512.png',
-      //         sizes: '512x512',
-      //         type: 'image/png',
-      //         purpose: 'any',
-      //       },
-      //       {
-      //         src: 'maskable-192x192.png',
-      //         sizes: '192x192',
-      //         type: 'image/png',
-      //         purpose: 'maskable',
-      //       },
-      //       {
-      //         src: 'maskable-512x512.png',
-      //         sizes: '512x512',
-      //         type: 'image/png',
-      //         purpose: 'maskable',
-      //       },
-      //     ],
-      //   },
-      //   workbox: {
-      //     cleanupOutdatedCaches: true,
-      //     clientsClaim: true,
-      //     skipWaiting: true,
-      //     navigateFallbackDenylist: [/^\/saml\//],
-      //   },
-      // }),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon-pwa.png', 'apple-touch-icon-pwa.png'],
+        manifest: {
+          name: 'Pilargroup Dashboard IT',
+          short_name: 'Pilargroup',
+          description: 'Internal dashboard PT. Pilar Niaga Makmur.',
+          lang: 'id',
+          theme_color: '#1f4e8c',
+          background_color: '#f7fbff',
+          display: 'standalone',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            {
+              src: 'pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'maskable-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: 'maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          navigateFallbackDenylist: [/^\/saml\//],
+        },
+      }),
     ],
     resolve: {
       alias: {
