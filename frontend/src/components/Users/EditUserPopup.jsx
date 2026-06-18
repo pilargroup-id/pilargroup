@@ -151,6 +151,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
   const [departmentsSearch, setDepartmentsSearch] = useState('')
   const [classSearch, setClassSearch] = useState('')
   const [selectedGroups, setSelectedGroups] = useState([])
+  const [showPassword, setShowPassword] = useState(false)
   const [tabValue, setTabValue] = useState(0)
   const appsListId = 'edit-user-popup-apps-list'
   const companiesListId = 'edit-user-popup-companies-list'
@@ -210,6 +211,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
       setProjects([])
       setCompanies([])
       setSelectedGroups([])
+      setShowPassword(false)
       setAppsDropdownOpen(false)
       setCompaniesDropdownOpen(false)
       setDepartmentsDropdownOpen(false)
@@ -221,6 +223,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     }
 
     setFormValues(getEditFormState(user))
+    setShowPassword(false)
     setAppsDropdownOpen(false)
     setCompaniesDropdownOpen(false)
     setDepartmentsDropdownOpen(false)
@@ -426,6 +429,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     setDepartmentsSearch('')
     setClassSearch('')
     setSelectedGroups([])
+    setShowPassword(false)
     setTabValue(0)
     onClose?.()
   }
@@ -566,16 +570,66 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
                       <label className="register-user-popup__field">
                         <span className="register-user-popup__label">Password</span>
-                        <input
-                          className="register-user-popup__input"
-                          type="password"
-                          name="password"
-                          value={formValues.password}
-                          onChange={handleChange}
-                          placeholder="Kosongkan jika tidak diubah"
-                          autoComplete="new-password"
-                          minLength={6}
-                        />
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            className="register-user-popup__input"
+                            type={showPassword ? 'text' : 'password'}
+                            name="password"
+                            value={formValues.password}
+                            onChange={handleChange}
+                            placeholder="Kosongkan jika tidak diubah"
+                            autoComplete="new-password"
+                            minLength={6}
+                            style={{ width: '100%', paddingRight: '40px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((current) => !current)}
+                            style={{
+                              position: 'absolute',
+                              right: '12px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              color: '#64748b',
+                            }}
+                            aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                          >
+                            {showPassword ? (
+                              <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                              </svg>
+                            ) : (
+                              <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       </label>
 
                       <label className="register-user-popup__field">
