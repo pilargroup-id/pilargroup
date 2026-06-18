@@ -33,9 +33,6 @@ const handleSubmit = async (event) => {
   event.preventDefault()
   if (isSubmitting) return
 
-  console.log('FULL URL saat submit:', window.location.href)
-  console.log('SEARCH:', window.location.search)
-
   setErrorMessage('')
   setIsSubmitting(true)
 
@@ -46,8 +43,9 @@ const handleSubmit = async (event) => {
 
     const { token, redirect } = await submitLogin(loginPayload)
 
-    const params    = new URLSearchParams(window.location.search)
-    const samlToken = params.get('saml_token')
+    // Ganti nama 'params' jadi 'urlParams' supaya tidak clash
+    const urlParams  = new URLSearchParams(window.location.search)
+    const samlToken  = urlParams.get('saml_token')
 
     // 1. SAML flow
     if (samlToken && token) {
@@ -86,19 +84,17 @@ const handleSubmit = async (event) => {
       return
     }
 
-    // 2. SSO redirect (dari login PG sendiri via sso_token)
+    // 2. SSO redirect
     if (redirect) {
       window.location.href = redirect
       return
     }
 
-    // 3. SSO Authorize (direct akses dari ticket)
-    const ssoAuthorize = params.get('sso_authorize')
-    const clientId     = params.get('client_id')
-    const redirectUri  = params.get('redirect_uri')
-    const ssoState     = params.get('state')
-
-    console.log('SSO Authorize params:', { ssoAuthorize, clientId, redirectUri, ssoState })
+    // 3. SSO Authorize
+    const ssoAuthorize = urlParams.get('sso_authorize')
+    const clientId     = urlParams.get('client_id')
+    const redirectUri  = urlParams.get('redirect_uri')
+    const ssoState     = urlParams.get('state')
 
     if (ssoAuthorize && clientId && redirectUri && ssoState && token) {
       try {
@@ -125,8 +121,8 @@ const handleSubmit = async (event) => {
       }
     }
 
-    // 4. return_url (dari treeview, touchpoint)
-    const returnUrl = params.get('return_url')
+    // 4. return_url
+    const returnUrl = urlParams.get('return_url')
 
     if (returnUrl && token) {
       try {
@@ -137,7 +133,7 @@ const handleSubmit = async (event) => {
           return
         }
       } catch {
-        // URL tidak valid, fallback ke dashboard
+        // fallback ke dashboard
       }
     }
 

@@ -12,8 +12,8 @@ class SnipeItService
 
     public function __construct()
     {
-        $this->baseUrl = env('SNIPEIT_API_URL', 'https://assetit.pilargroup.id');
-        $this->token   = env('SNIPEIT_API_TOKEN', '');
+        $this->baseUrl = config('snipeit.api_url', 'https://assetit.pilargroup.id');
+        $this->token   = config('snipeit.api_token', '');
     }
 
     public function findUser(string $username): ?array

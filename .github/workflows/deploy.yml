@@ -89,7 +89,12 @@ jobs:
             echo '>> Composer install'
             composer install --no-dev --optimize-autoloader --no-interaction
 
-            echo '>> Artisan cache'
+            echo '>> Clear Laravel cache'
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan optimize:clear
+
+            echo '>> Rebuild Laravel cache'
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache

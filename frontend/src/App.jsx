@@ -128,6 +128,8 @@ async function handleSamlIfNeeded() {
     }
 
     const html = await res.text()
+    console.log('handleSamlIfNeeded html length:', html.length)
+    console.log('handleSamlIfNeeded html preview:', html.substring(0, 500))
 
     if (!html.includes('SAMLResponse')) {
       window.location.href = 'https://pilargroup.id/dashboard'
