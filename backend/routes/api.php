@@ -6,10 +6,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MasterController;
+use App\Http\Controllers\BusinessUnitController;
 use App\Http\Controllers\SamlController;
 use App\Http\Controllers\SSOController;
 use App\Http\Controllers\Internal\DirectoryController;
-
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -39,10 +39,8 @@ Route::prefix('users')
 Route::prefix('master')
     ->middleware('auth.central')
     ->group(function () {
-
         Route::get('/departments', [MasterController::class, 'getDepartments']);
         Route::get('/projects', [MasterController::class, 'getProjects']);
-        Route::get('/companies', [MasterController::class, 'getCompanies']);
 
         // CRUD master - IT only
         Route::middleware('it.only')->group(function () {
@@ -59,9 +57,12 @@ Route::prefix('master')
             Route::put('/job-levels/{id}', [MasterController::class, 'updateJobLevel']);
             Route::delete('/job-levels/{id}', [MasterController::class, 'destroyJobLevel']);
 
-            Route::post('/companies', [MasterController::class, 'storeCompany']);
-            Route::put('/companies/{id}', [MasterController::class, 'updateCompany']);
-            Route::delete('/companies/{id}', [MasterController::class, 'deleteCompany']);
+            Route::get('/business-units', [BusinessUnitController::class, 'index']);
+            Route::post('/business-units', [BusinessUnitController::class, 'store']);
+            Route::get('/business-units/{id}', [BusinessUnitController::class, 'show']);
+            Route::put('/business-units/{id}', [BusinessUnitController::class, 'update']);
+            Route::patch('/business-units/{id}/status', [BusinessUnitController::class, 'updateStatus']);
+            Route::delete('/business-units/{id}', [BusinessUnitController::class, 'destroy']);
         });
     });
     
@@ -91,3 +92,4 @@ Route::get('/sso/authorize', [SSOController::class, 'authorize'])
     ->name('sso.authorize');
 
 Route::post('/sso/verify', [SSOController::class, 'verify']);
+
