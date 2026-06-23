@@ -4,6 +4,15 @@ Dokumentasi ini menjelaskan cara FE menggunakan fitur import user dari Excel di 
 
 ---
 
+## Backend Dependency
+
+Fitur User Excel Import membutuhkan PhpSpreadsheet.
+
+Install:
+
+```bash
+composer require phpoffice/phpspreadsheet
+
 # 1. Overview
 
 Fitur import user digunakan untuk create/update data user melalui file Excel.
