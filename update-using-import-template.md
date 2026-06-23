@@ -12,6 +12,7 @@ Install:
 
 ```bash
 composer require phpoffice/phpspreadsheet
+```
 
 # 1. Overview
 
