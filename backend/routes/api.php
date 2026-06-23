@@ -10,6 +10,7 @@ use App\Http\Controllers\BusinessUnitController;
 use App\Http\Controllers\SamlController;
 use App\Http\Controllers\SSOController;
 use App\Http\Controllers\Internal\DirectoryController;
+use App\Http\Controllers\UserImportController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -27,13 +28,26 @@ Route::prefix('auth')
     });
 
 Route::prefix('users')
-    ->middleware(['auth.central', 'it.only'])
+    ->middleware('auth.central')
     ->group(function () {
-        Route::get('/', [UserManagementController::class, 'index']);
-        Route::post('/', [UserManagementController::class, 'store']);
-        Route::get('/{id}', [UserManagementController::class, 'show']);
-        Route::put('/{id}', [UserManagementController::class, 'update']);
-        Route::delete('/{id}', [UserManagementController::class, 'destroy']);
+        // User import - IT only
+        Route::middleware('it.only')->group(function () {
+            Route::get('/import-template', [UserImportController::class, 'downloadTemplate']);
+            Route::post('/import', [UserImportController::class, 'import']);
+        });
+
+        // User management - IT full access, HCGA limited access
+        Route::middleware('user.management.access')->group(function () {
+            Route::get('/', [UserManagementController::class, 'index']);
+            Route::post('/', [UserManagementController::class, 'store']);
+            Route::patch('/{id}/status', [UserManagementController::class, 'updateStatus']);
+            Route::get('/{id}', [UserManagementController::class, 'show']);
+            Route::put('/{id}', [UserManagementController::class, 'update']);
+        });
+
+        // Delete user - IT only
+        Route::delete('/{id}', [UserManagementController::class, 'destroy'])
+            ->middleware('it.only');
     });
 
 Route::prefix('master')
@@ -41,6 +55,11 @@ Route::prefix('master')
     ->group(function () {
         Route::get('/departments', [MasterController::class, 'getDepartments']);
         Route::get('/projects', [MasterController::class, 'getProjects']);
+
+        // Needed by User Management form.
+        // Accessible by IT and HCGA.
+        Route::get('/job-levels', [MasterController::class, 'getJobLevels'])
+            ->middleware('user.management.access');
 
         // CRUD master - IT only
         Route::middleware('it.only')->group(function () {
@@ -52,7 +71,6 @@ Route::prefix('master')
             Route::put('/projects/{id}', [MasterController::class, 'updateProject']);
             Route::delete('/projects/{id}', [MasterController::class, 'deleteProject']);
 
-            Route::get('/job-levels', [MasterController::class, 'getJobLevels']);
             Route::post('/job-levels', [MasterController::class, 'storeJobLevel']);
             Route::put('/job-levels/{id}', [MasterController::class, 'updateJobLevel']);
             Route::delete('/job-levels/{id}', [MasterController::class, 'destroyJobLevel']);
@@ -65,7 +83,6 @@ Route::prefix('master')
             Route::delete('/business-units/{id}', [BusinessUnitController::class, 'destroy']);
         });
     });
-    
 
 Route::middleware(\App\Http\Middleware\AuthMiddleware::class)
     ->post('/saml/respond', function (\Illuminate\Http\Request $request) {
@@ -92,4 +109,3 @@ Route::get('/sso/authorize', [SSOController::class, 'authorize'])
     ->name('sso.authorize');
 
 Route::post('/sso/verify', [SSOController::class, 'verify']);
-
