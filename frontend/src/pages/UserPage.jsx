@@ -10,47 +10,27 @@ import {
   deleteManagedUser,
   getManagedUsers,
   updateManagedUser,
+  updateManagedUserStatus,
 } from '@/services/manageUsers'
+import { getStoredUser } from '@/services/api'
+import { canManageUserTarget, isITUser } from '@/services/accessControl'
 import RegisterUserPopup from '@/components/Users/RegisterUserPopup'
 import EditUserPopup from '@/components/Users/EditUserPopup'
 import DeleteUserPopup from '@/components/Users/DeleteUserPopup'
 
 const USERS_PER_PAGE = 10
 
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const paginationItems = [1]
-  const windowStart = Math.max(2, currentPage - 1)
-  const windowEnd = Math.min(totalPages - 1, currentPage + 1)
-
-  if (windowStart > 2) {
-    paginationItems.push('start-ellipsis')
-  }
-
-  for (let page = windowStart; page <= windowEnd; page += 1) {
-    paginationItems.push(page)
-  }
-
-  if (windowEnd < totalPages - 1) {
-    paginationItems.push('end-ellipsis')
-  }
-
-  paginationItems.push(totalPages)
-
-  return paginationItems
-}
-
 function getManagedUserId(user) {
   return user?.raw?.id ?? user?.userId ?? null
 }
 
-function buildUpdateUserPayload(formValues) {
+function buildUpdateUserPayload(formValues, { includeApps = true } = {}) {
   const payload = {
     is_active: formValues.is_active === 'true',
-    apps: Array.from(new Set(Array.isArray(formValues.apps) ? formValues.apps : [])),
+  }
+
+  if (includeApps) {
+    payload.apps = Array.from(new Set(Array.isArray(formValues.apps) ? formValues.apps : []))
   }
 
   const username = formValues.username.trim()
@@ -114,7 +94,6 @@ function UserPage() {
   const [userList, setUserList] = useState([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
   const [usersError, setUsersError] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
   const [isRegisterPopupOpen, setIsRegisterPopupOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
@@ -122,7 +101,13 @@ function UserPage() {
   const [deleteUserError, setDeleteUserError] = useState('')
   const [isUpdatingUser, setIsUpdatingUser] = useState(false)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
+  const [updatingStatusUserIds, setUpdatingStatusUserIds] = useState([])
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+  const accessUser = getStoredUser()
+  const canManageApps = isITUser(accessUser)
+  const canDeleteUsers = canManageApps
+
+  const canEditManagedUser = (user) => canManageUserTarget(user, accessUser)
 
   const loadUsers = async () => {
     setUsersError('')
@@ -143,13 +128,8 @@ function UserPage() {
     void loadUsers()
   }, [])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [normalizedSearchQuery])
-
   const handleRefresh = () => {
     setSearchQuery('')
-    setCurrentPage(1)
     void loadUsers()
   }
 
@@ -159,6 +139,10 @@ function UserPage() {
   }
 
   const handleOpenEditUser = (user) => {
+    if (!canEditManagedUser(user)) {
+      return
+    }
+
     setDeleteUserError('')
     setDeletingUser(null)
     setEditUserError('')
@@ -176,6 +160,11 @@ function UserPage() {
 
   const handleSubmitEditUser = async (formValues) => {
     if (!editingUser) {
+      return
+    }
+
+    if (!canEditManagedUser(editingUser)) {
+      setEditUserError('HCGA hanya bisa mengelola user dengan job level minimal 1.')
       return
     }
 
@@ -210,7 +199,7 @@ function UserPage() {
     setIsUpdatingUser(true)
 
     try {
-      const payload = buildUpdateUserPayload(formValues)
+      const payload = buildUpdateUserPayload(formValues, { includeApps: canManageApps })
       await updateManagedUser(userId, payload)
       setEditingUser(null)
       await loadUsers()
@@ -221,7 +210,40 @@ function UserPage() {
     }
   }
 
+  const handleChangeUserStatus = async (user, isActive) => {
+    if (!canEditManagedUser(user)) {
+      return
+    }
+
+    const userId = getManagedUserId(user)
+
+    if (!userId) {
+      setUsersError('User ID tidak ditemukan.')
+      return
+    }
+
+    setUsersError('')
+    setUpdatingStatusUserIds((currentUserIds) =>
+      currentUserIds.includes(user.userId) ? currentUserIds : [...currentUserIds, user.userId],
+    )
+
+    try {
+      await updateManagedUserStatus(userId, isActive)
+      await loadUsers()
+    } catch (error) {
+      setUsersError(error?.message || 'Gagal memperbarui status user.')
+    } finally {
+      setUpdatingStatusUserIds((currentUserIds) =>
+        currentUserIds.filter((currentUserId) => currentUserId !== user.userId),
+      )
+    }
+  }
+
   const handleOpenDeleteUser = (user) => {
+    if (!canDeleteUsers) {
+      return
+    }
+
     setEditUserError('')
     setEditingUser(null)
     setDeleteUserError('')
@@ -239,6 +261,11 @@ function UserPage() {
 
   const handleConfirmDeleteUser = async () => {
     if (!deletingUser) {
+      return
+    }
+
+    if (!canDeleteUsers) {
+      setDeleteUserError('HCGA tidak memiliki akses untuk menghapus user.')
       return
     }
 
@@ -275,16 +302,6 @@ function UserPage() {
     )
   })
 
-  const totalUsers = filteredUsers.length
-  const totalPages = Math.max(1, Math.ceil(totalUsers / USERS_PER_PAGE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const pageStartIndex = (safeCurrentPage - 1) * USERS_PER_PAGE
-  const pageEndIndex = pageStartIndex + USERS_PER_PAGE
-  const paginatedUsers = filteredUsers.slice(pageStartIndex, pageEndIndex)
-  const paginationItems = getPaginationItems(safeCurrentPage, totalPages)
-  const visibleFrom = totalUsers === 0 ? 0 : pageStartIndex + 1
-  const visibleTo = Math.min(pageEndIndex, totalUsers)
-
   const tableMessage = isLoadingUsers
     ? 'Loading users from database...'
     : usersError
@@ -293,21 +310,9 @@ function UserPage() {
         ? 'No users found. Try another keyword or use refresh to reset the search.'
         : 'No users available.'
 
-  const pagination =
-    !isLoadingUsers && !usersError && totalUsers > 0
-      ? {
-          summary: `Showing ${visibleFrom}-${visibleTo} of ${totalUsers} users`,
-          currentPage: safeCurrentPage,
-          totalPages,
-          items: paginationItems,
-          onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
-          onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
-          onSelect: (page) => setCurrentPage(page),
-        }
-      : null
-
   return (
     <AppLayout
+      className="users-page-layout"
       headerProps={{
         title: 'Pilargroup',
         subtitle: 'Manage your recruitment process',
@@ -326,7 +331,7 @@ function UserPage() {
         activePath: '/users',
       }}
     >
-      <section className="dashboard-content">
+      <section className="dashboard-content users-page">
         <article className="dashboard-panel users-table-card">
           <div className="dashboard-panel__header users-table-card__header">
             <div>
@@ -345,11 +350,15 @@ function UserPage() {
           </div>
 
           <TableUser
-            users={paginatedUsers}
+            users={filteredUsers}
             tableMessage={tableMessage}
-            pagination={pagination}
+            usersPerPage={USERS_PER_PAGE}
             onEditUser={handleOpenEditUser}
             onDeleteUser={handleOpenDeleteUser}
+            onStatusChange={handleChangeUserStatus}
+            canEditUser={canEditManagedUser}
+            canDeleteUser={() => canDeleteUsers}
+            updatingStatusUserIds={updatingStatusUserIds}
           />
         </article>
       </section>
@@ -358,6 +367,7 @@ function UserPage() {
         isOpen={isRegisterPopupOpen}
         onClose={() => setIsRegisterPopupOpen(false)}
         onSubmit={handleRegisterUser}
+        showAppsAccess={canManageApps}
       />
 
       <EditUserPopup
@@ -366,6 +376,7 @@ function UserPage() {
         errorMessage={editingUser ? editUserError : ''}
         onClose={handleCloseEditUser}
         onSubmit={handleSubmitEditUser}
+        showAppsAccess={canManageApps}
       />
 
       <DeleteUserPopup

@@ -209,6 +209,27 @@ function normalizeLookupValue(value) {
   return normalizedValue ? normalizedValue.toLowerCase() : null
 }
 
+function normalizeEmploymentType(rawUser = {}) {
+  const employmentType = normalizeOptionalText(
+    rawUser.employment_type_code ??
+      rawUser.employmentTypeCode ??
+      rawUser.employment_type ??
+      rawUser.employmentType,
+  )
+
+  const employmentTypeLabels = {
+    UP: 'Under Pilar',
+    OS: 'Outsourced',
+    HL: 'Harian Lepas',
+  }
+
+  if (!employmentType) {
+    return '-'
+  }
+
+  return employmentTypeLabels[employmentType.toUpperCase()] ?? employmentType
+}
+
 export function normalizeManagedUserApps(apps) {
   if (!Array.isArray(apps)) {
     return []
@@ -297,6 +318,7 @@ export function normalizeManagedUser(rawUser = {}) {
       return '-';
     })(),
     role: normalizeRole(rawUser),
+    employmentType: normalizeEmploymentType(rawUser),
     company: Array.isArray(rawUser.companies) && rawUser.companies.length > 0
       ? rawUser.companies.map((c) => c.code || c.name).filter(Boolean).join(', ')
       : '-',
@@ -352,6 +374,18 @@ export async function updateManagedUser(id, userData) {
   return payload
 }
 
+export async function updateManagedUserStatus(id, isActive) {
+  const payload = await api.request(`${USERS_PATH}/${id}/status`, {
+    method: 'PATCH',
+    body: {
+      status: isActive ? 'active' : 'inactive',
+      is_active: isActive,
+    },
+  })
+
+  return payload
+}
+
 export async function deleteManagedUser(id) {
   const payload = await api.request(`${USERS_PATH}/${id}`, {
     method: 'DELETE',
@@ -365,6 +399,7 @@ const manageUsersService = {
   getUserById: getManagedUserById,
   registerUser,
   updateUser: updateManagedUser,
+  updateUserStatus: updateManagedUserStatus,
   deleteUser: deleteManagedUser,
   normalizeUser: normalizeManagedUser,
   normalizeUsers: normalizeManagedUsers,

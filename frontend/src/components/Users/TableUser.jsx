@@ -1,5 +1,15 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Edit03, Trash03 } from '@untitledui/icons'
+
+const DEFAULT_USERS_PER_PAGE = 10
+const EMPTY_FILTERS = {
+  company: '',
+  department: '',
+  departmentClass: '',
+  employmentType: '',
+  apps: '',
+  status: '',
+}
 
 function getInitials(name = '') {
   return String(name)
@@ -24,7 +34,43 @@ function getDetailValue(value) {
   }
 
   return value
-}`  `
+}
+
+function Switch({
+  checked,
+  defaultChecked = false,
+  disabled = false,
+  inputProps = {},
+  onChange,
+  ...props
+}) {
+  const isControlled = checked !== undefined
+  const switchChecked = isControlled ? checked : defaultChecked
+
+  return (
+    <label
+      className={`users-table-switch${switchChecked ? ' users-table-switch--checked' : ''}${
+        disabled ? ' users-table-switch--disabled' : ''
+      }`}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+      {...props}
+    >
+      <input
+        type="checkbox"
+        className="users-table-switch__input"
+        checked={isControlled ? checked : undefined}
+        defaultChecked={isControlled ? undefined : defaultChecked}
+        disabled={disabled}
+        onChange={onChange}
+        {...inputProps}
+      />
+      <span className="users-table-switch__track" aria-hidden="true">
+        <span className="users-table-switch__thumb" />
+      </span>
+    </label>
+  )
+}
 
 function formatAppsForTable(apps) {
   if (!Array.isArray(apps)) {
@@ -121,6 +167,85 @@ function renderCompaniesForTable(company) {
   )
 }
 
+function getEmploymentTypeLabel(value) {
+  const employmentTypeLabels = {
+    UP: 'Under Pilar',
+    OS: 'Outsourced',
+    HL: 'Harian Lepas',
+  }
+  const normalizedValue = value === undefined || value === null ? '' : String(value).trim()
+
+  if (!normalizedValue || normalizedValue === '-') {
+    return '-'
+  }
+
+  return employmentTypeLabels[normalizedValue.toUpperCase()] ?? normalizedValue
+}
+
+function normalizeFilterValue(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function getPaginationItems(currentPage, totalPages) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const paginationItems = [1]
+  const windowStart = Math.max(2, currentPage - 1)
+  const windowEnd = Math.min(totalPages - 1, currentPage + 1)
+
+  if (windowStart > 2) {
+    paginationItems.push('start-ellipsis')
+  }
+
+  for (let page = windowStart; page <= windowEnd; page += 1) {
+    paginationItems.push(page)
+  }
+
+  if (windowEnd < totalPages - 1) {
+    paginationItems.push('end-ellipsis')
+  }
+
+  paginationItems.push(totalPages)
+
+  return paginationItems
+}
+
+function getUniqueOptions(users, getValues) {
+  const optionsByKey = new Map()
+
+  users.forEach((user) => {
+    getValues(user).forEach((value) => {
+      const label = String(value ?? '').trim()
+
+      if (!label || label === '-') {
+        return
+      }
+
+      const key = normalizeFilterValue(label)
+
+      if (!optionsByKey.has(key)) {
+        optionsByKey.set(key, label)
+      }
+    })
+  })
+
+  return Array.from(optionsByKey.values()).sort((firstOption, secondOption) =>
+    firstOption.localeCompare(secondOption),
+  )
+}
+
+function userMatchesFilter(values, selectedValue) {
+  if (!selectedValue) {
+    return true
+  }
+
+  const normalizedSelectedValue = normalizeFilterValue(selectedValue)
+
+  return values.some((value) => normalizeFilterValue(value) === normalizedSelectedValue)
+}
+
 function renderDetailValue(value) {
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -207,6 +332,18 @@ function getDetailSections(user) {
           ),
         },
         {
+          label: 'employment_type_code',
+          value: getDetailValue(
+            getEmploymentTypeLabel(
+              rawUser.employment_type_code ??
+                rawUser.employmentTypeCode ??
+                rawUser.employment_type ??
+                rawUser.employmentType ??
+                user.employmentType,
+            ),
+          ),
+        },
+        {
           label: 'job_position',
           value: getDetailValue(rawUser.job_position ?? rawUser.jobPosition),
         },
@@ -239,11 +376,75 @@ function TableUser({
   users = [],
   tableMessage = '',
   pagination = null,
+  usersPerPage = DEFAULT_USERS_PER_PAGE,
   onEditUser,
   onDeleteUser,
+  onStatusChange,
+  canEditUser = () => true,
+  canDeleteUser = () => true,
+  updatingStatusUserIds = [],
 }) {
   const [expandedUserId, setExpandedUserId] = useState(null)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [currentPage, setCurrentPage] = useState(1)
   const visibleUserIdsKey = users.map((user) => user.userId).join('|')
+  const hasActiveFilters = Object.values(filters).some(Boolean)
+
+  const filterOptions = useMemo(
+    () => ({
+      company: getUniqueOptions(users, (user) => formatCompaniesForTable(user.company)),
+      department: getUniqueOptions(users, (user) => formatDepartmentsForTable(user.division)),
+      departmentClass: getUniqueOptions(users, (user) => [user.departmentClass]),
+      employmentType: getUniqueOptions(users, (user) => [
+        getEmploymentTypeLabel(user.employmentType),
+      ]),
+      apps: getUniqueOptions(users, (user) => formatAppsForTable(user.apps)),
+      status: getUniqueOptions(users, (user) => [user.status]),
+    }),
+    [users],
+  )
+
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((user) =>
+        userMatchesFilter(formatCompaniesForTable(user.company), filters.company) &&
+        userMatchesFilter(formatDepartmentsForTable(user.division), filters.department) &&
+        userMatchesFilter([user.departmentClass], filters.departmentClass) &&
+        userMatchesFilter([getEmploymentTypeLabel(user.employmentType)], filters.employmentType) &&
+        userMatchesFilter(formatAppsForTable(user.apps), filters.apps) &&
+        userMatchesFilter([user.status], filters.status),
+      ),
+    [filters, users],
+  )
+
+  const internalPaginationEnabled = !pagination && usersPerPage > 0
+  const totalUsers = filteredUsers.length
+  const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const pageStartIndex = internalPaginationEnabled ? (safeCurrentPage - 1) * usersPerPage : 0
+  const pageEndIndex = internalPaginationEnabled ? pageStartIndex + usersPerPage : totalUsers
+  const visibleUsers = internalPaginationEnabled
+    ? filteredUsers.slice(pageStartIndex, pageEndIndex)
+    : filteredUsers
+  const visibleFrom = totalUsers === 0 ? 0 : pageStartIndex + 1
+  const visibleTo = Math.min(pageEndIndex, totalUsers)
+  const tablePagination =
+    pagination ??
+    (totalUsers > 0
+      ? {
+          summary: `Showing ${visibleFrom}-${visibleTo} of ${totalUsers} users`,
+          currentPage: safeCurrentPage,
+          totalPages,
+          items: getPaginationItems(safeCurrentPage, totalPages),
+          onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
+          onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
+          onSelect: (page) => setCurrentPage(page),
+        }
+      : null)
+  const emptyMessage =
+    users.length > 0 && hasActiveFilters
+      ? 'No users match the selected filters.'
+      : tableMessage
 
   useEffect(() => {
     setExpandedUserId((currentExpandedUserId) => {
@@ -256,6 +457,11 @@ function TableUser({
         : null
     })
   }, [visibleUserIdsKey])
+
+  useEffect(() => {
+    setCurrentPage(1)
+    setExpandedUserId(null)
+  }, [filters, visibleUserIdsKey])
 
   const handleToggleUser = (userId) => {
     setExpandedUserId((currentExpandedUserId) =>
@@ -282,8 +488,62 @@ function TableUser({
     onDeleteUser?.(user)
   }
 
+  const handleChangeUserStatus = (event, user) => {
+    event.stopPropagation()
+    onStatusChange?.(user, event.target.checked)
+  }
+
+  const handleFilterChange = (filterKey, value) => {
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      [filterKey]: value,
+    }))
+  }
+
+  const handleClearFilters = () => {
+    setFilters(EMPTY_FILTERS)
+  }
+
+  const renderFilterSelect = (filterKey, label, options) => (
+    <label className="users-table-filter__field">
+      <span className="users-table-filter__label">{label}</span>
+      <select
+        className="users-table-filter__select"
+        value={filters[filterKey]}
+        onChange={(event) => handleFilterChange(filterKey, event.target.value)}
+      >
+        <option value="">All {label}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+
   return (
     <>
+      <div className="users-table-filter" aria-label="User table filters">
+        <div className="users-table-filter__grid">
+          {renderFilterSelect('company', 'Company', filterOptions.company)}
+          {renderFilterSelect('department', 'Departments', filterOptions.department)}
+          {renderFilterSelect('departmentClass', 'Class', filterOptions.departmentClass)}
+          {renderFilterSelect('employmentType', 'Employment Type', filterOptions.employmentType)}
+          {renderFilterSelect('apps', 'Apps', filterOptions.apps)}
+          {renderFilterSelect('status', 'Status', filterOptions.status)}
+        </div>
+
+        <button
+          type="button"
+          className="users-table-filter__clear"
+          onClick={handleClearFilters}
+          disabled={!hasActiveFilters}
+        >
+          Clear filters
+        </button>
+      </div>
+
       <div className="users-table-wrapper">
         <table className="users-table">
           <thead>
@@ -292,22 +552,33 @@ function TableUser({
               <th scope="col">Company</th>
               <th scope="col">Departments</th>
               <th scope="col">Class</th>
+              <th scope="col">Employment Type</th>
               <th scope="col">Role</th>
+              <th scope="col">Status</th>
               <th scope="col">Apps</th>
               <th scope="col" className="users-table__detail-header">
-                Detail
+                Action
               </th>
             </tr>
           </thead>
 
           <tbody>
-            {users.length > 0 ? (
-              users.map((user) => {
+            {visibleUsers.length > 0 ? (
+              visibleUsers.map((user) => {
                 const isExpanded = expandedUserId === user.userId
                 const accordionId = `users-table-accordion-${user.userId}`
                 const detailSections = getDetailSections(user)
                 const userStatusKey = user.statusKey ?? 'inactive'
                 const userStatusLabel = user.status ?? '-'
+                const allowEditUser = canEditUser(user)
+                const allowDeleteUser = canDeleteUser(user)
+                const isActiveUser = userStatusKey === 'active'
+                const isUpdatingStatus = updatingStatusUserIds.includes(user.userId)
+                const label = {
+                  inputProps: {
+                    'aria-label': `Set ${user.name} status`,
+                  },
+                }
 
                 return (
                   <Fragment key={user.userId}>
@@ -326,11 +597,6 @@ function TableUser({
                           <div className="users-table__identity-copy">
                             <div className="users-table__name-row">
                               <strong className="users-table__name">{user.name}</strong>
-                              <span
-                                className={`users-table__status users-table__status--inline users-table__status--${userStatusKey}`}
-                              >
-                                {userStatusLabel}
-                              </span>
                             </div>
                             <p className="users-table__meta">{user.id}</p>
                           </div>
@@ -339,35 +605,78 @@ function TableUser({
                       <td>{renderCompaniesForTable(user.company)}</td>
                       <td>{renderDepartmentsForTable(user.division)}</td>
                       <td>{user.departmentClass || '-'}</td>
+                      <td>{getEmploymentTypeLabel(user.employmentType)}</td>
                       <td>{user.role}</td>
+                      <td>
+                        <div className="users-table__status-toggle">
+                          <Switch
+                            {...label}
+                            defaultChecked={isActiveUser}
+                            checked={isActiveUser}
+                            disabled={!allowEditUser || isUpdatingStatus}
+                            onChange={(event) => handleChangeUserStatus(event, user)}
+                          />
+                          <span
+                            className={`users-table__status users-table__status--inline users-table__status--${userStatusKey}`}
+                          >
+                            {userStatusLabel}
+                          </span>
+                        </div>
+                      </td>
                       <td>{renderAppsForTable(user.apps)}</td>
                       <td className="users-table__detail-cell">
-                        <button
-                          type="button"
-                          className="users-table__detail-button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleToggleUser(user.userId)
-                          }}
-                          aria-expanded={isExpanded}
-                          aria-controls={accordionId}
-                          title={isExpanded ? 'Tutup detail user' : 'Buka detail user'}
-                        >
-                          <span>Detail</span>
-                          <ChevronDown
-                            size={16}
-                            aria-hidden="true"
-                            className={`users-table__detail-icon${
-                              isExpanded ? ' users-table__detail-icon--open' : ''
-                            }`}
-                          />
-                        </button>
+                        <div className="users-table__action-group">
+                          {allowEditUser ? (
+                            <button
+                              type="button"
+                              className="users-table__action-button"
+                              onClick={(event) => handleEditUser(event, user)}
+                              aria-label={`Edit ${user.name}`}
+                              title="Edit"
+                            >
+                              <Edit03 size={16} aria-hidden="true" />
+                            </button>
+                          ) : null}
+
+                          {allowDeleteUser ? (
+                            <button
+                              type="button"
+                              className="users-table__action-button users-table__action-button--danger"
+                              onClick={(event) => handleDeleteUser(event, user)}
+                              aria-label={`Delete ${user.name}`}
+                              title="Delete"
+                            >
+                              <Trash03 size={16} aria-hidden="true" />
+                            </button>
+                          ) : null}
+
+                           <button
+                            type="button"
+                            className="users-table__detail-button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleToggleUser(user.userId)
+                            }}
+                            aria-label={isExpanded ? 'Tutup detail user' : 'Buka detail user'}
+                            aria-expanded={isExpanded}
+                            aria-controls={accordionId}
+                            title={isExpanded ? 'Tutup detail user' : 'Buka detail user'}
+                          >
+                            <ChevronDown
+                              size={16}
+                              aria-hidden="true"
+                              className={`users-table__detail-icon${
+                                isExpanded ? ' users-table__detail-icon--open' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
                     {isExpanded ? (
                       <tr className="users-table__accordion-row">
-                        <td colSpan="7">
+                        <td colSpan="9">
                           <div className="users-table__accordion" id={accordionId}>
                             <div className="users-table__accordion-header">
                               <div className="users-table__accordion-copy">
@@ -411,25 +720,6 @@ function TableUser({
                               ))}
                             </div>
 
-                            <div className="users-table__accordion-actions">
-                              <button
-                                type="button"
-                                className="users-table__accordion-button"
-                                onClick={(event) => handleEditUser(event, user)}
-                              >
-                                <Edit03 size={16} aria-hidden="true" />
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                className="users-table__accordion-button users-table__accordion-button--danger"
-                                onClick={(event) => handleDeleteUser(event, user)}
-                              >
-                                <Trash03 size={16} aria-hidden="true" />
-                                Delete
-                              </button>
-                            </div>
                           </div>
                         </td>
                       </tr>
@@ -439,8 +729,8 @@ function TableUser({
               })
             ) : (
               <tr>
-                <td colSpan="7">
-                  <div className="users-table__empty">{tableMessage}</div>
+                <td colSpan="9">
+                  <div className="users-table__empty">{emptyMessage}</div>
                 </td>
               </tr>
             )}
@@ -448,30 +738,32 @@ function TableUser({
         </table>
       </div>
 
-      {pagination ? (
+      {tablePagination ? (
         <div className="users-table-pagination">
-          <p className="users-table-pagination__summary">{pagination.summary}</p>
+          <p className="users-table-pagination__summary">{tablePagination.summary}</p>
 
           <div className="users-table-pagination__controls" aria-label="Users pagination">
             <button
               type="button"
               className="users-table-pagination__button"
-              onClick={pagination.onPrevious}
-              disabled={pagination.currentPage === 1}
+              onClick={tablePagination.onPrevious}
+              disabled={tablePagination.currentPage === 1}
             >
               Previous
             </button>
 
-            {pagination.items.map((item) =>
+            {tablePagination.items.map((item) =>
               typeof item === 'number' ? (
                 <button
                   key={item}
                   type="button"
                   className={`users-table-pagination__button${
-                    item === pagination.currentPage ? ' users-table-pagination__button--active' : ''
+                    item === tablePagination.currentPage
+                      ? ' users-table-pagination__button--active'
+                      : ''
                   }`}
-                  onClick={() => pagination.onSelect(item)}
-                  aria-current={item === pagination.currentPage ? 'page' : undefined}
+                  onClick={() => tablePagination.onSelect(item)}
+                  aria-current={item === tablePagination.currentPage ? 'page' : undefined}
                 >
                   {item}
                 </button>
@@ -485,8 +777,8 @@ function TableUser({
             <button
               type="button"
               className="users-table-pagination__button"
-              onClick={pagination.onNext}
-              disabled={pagination.currentPage === pagination.totalPages}
+              onClick={tablePagination.onNext}
+              disabled={tablePagination.currentPage === tablePagination.totalPages}
             >
               Next
             </button>

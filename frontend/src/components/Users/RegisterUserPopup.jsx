@@ -19,8 +19,15 @@ const initialFormState = {
   job_level_id: '',
   internal_id: '',
   company_ids: [],
+  employment_type: '',
   apps: [],
 }
+
+const employmentTypeOptions = [
+  { value: 'UP', label: 'Under Pilar' },
+  { value: 'OS', label: 'Outsourced' },
+  { value: 'HL', label: 'Harian Lepas' },
+]
 
 function getSelectableProjects(projects) {
   if (!Array.isArray(projects)) {
@@ -41,12 +48,72 @@ function getSelectableProjects(projects) {
   })
 }
 
-function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
+function getCompanyList(data) {
+  const source = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray(data?.companies)
+        ? data.companies
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.results)
+            ? data.results
+            : []
+
+  return source
+    .map((company) => {
+      const id = company?.id ?? company?.company_id ?? company?.companyId ?? company?.code
+      const name = company?.name ?? company?.company_name ?? company?.companyName ?? company?.code
+
+      if (id === undefined || id === null || !name) {
+        return null
+      }
+
+      return {
+        ...company,
+        id,
+        name: String(name),
+      }
+    })
+    .filter(Boolean)
+}
+
+function getCompaniesFromDepartments(departments) {
+  if (!Array.isArray(departments)) {
+    return []
+  }
+
+  const companiesById = new Map()
+
+  departments.forEach((department) => {
+    const id = department?.companyId || department?.raw?.company_id
+    const name = department?.companyName || department?.raw?.company_name
+
+    if (!id || !name || name === '-') {
+      return
+    }
+
+    companiesById.set(String(id), {
+      id: String(id),
+      name: String(name),
+      code: department?.raw?.company_code,
+    })
+  })
+
+  return Array.from(companiesById.values()).sort((firstCompany, secondCompany) =>
+    firstCompany.name.localeCompare(secondCompany.name),
+  )
+}
+
+function RegisterUserPopup({ isOpen, onClose, onSubmit, showAppsAccess = true }) {
   const [formValues, setFormValues] = useState(initialFormState)
   const [departments, setDepartments] = useState([])
   const [projects, setProjects] = useState([])
   const [jobLevels, setJobLevels] = useState([])
   const [companies, setCompanies] = useState([])
+  const [companiesLoading, setCompaniesLoading] = useState(false)
+  const [companiesError, setCompaniesError] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [appsDropdownOpen, setAppsDropdownOpen] = useState(false)
@@ -107,6 +174,8 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     if (!isOpen) {
       setAppsDropdownOpen(false)
       setCompaniesDropdownOpen(false)
+      setCompaniesLoading(false)
+      setCompaniesError('')
       setDepartmentsDropdownOpen(false)
       setClassDropdownOpen(false)
       setDepartmentsSearch('')
@@ -121,6 +190,8 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         setError('')
         setAppsDropdownOpen(false)
         setCompaniesDropdownOpen(false)
+        setCompaniesLoading(false)
+        setCompaniesError('')
         setDepartmentsDropdownOpen(false)
         setClassDropdownOpen(false)
         setDepartmentsSearch('')
@@ -133,30 +204,59 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
 
     window.addEventListener('keydown', handleKeyDown)
 
-    // Fetch departments and projects
+    let isActive = true
+
+    // Fetch departments, projects, job levels, and companies
     const fetchData = async () => {
+      setCompaniesLoading(true)
+      setCompaniesError('')
+
       try {
-        const [depts, projs, jls, comps] = await Promise.all([
+        const [depts, projs, jls, companiesResult] = await Promise.all([
           getDepartments(),
-          getProjects(),
+          showAppsAccess ? getProjects() : Promise.resolve([]),
           getJobLevels(),
-          api.request('/master/companies').then((data) => (Array.isArray(data) ? data : data?.data || [])).catch(() => []),
+          api
+            .request('/master/companies')
+            .then((data) => ({ data }))
+            .catch((error) => ({ error })),
         ])
+
+        if (!isActive) {
+          return
+        }
+
         setDepartments(depts)
-        setProjects(projs)
+        setProjects(showAppsAccess ? projs : [])
         setJobLevels(jls)
-        setCompanies(comps)
+        const companyList = companiesResult.error
+          ? getCompaniesFromDepartments(depts)
+          : getCompanyList(companiesResult.data)
+
+        setCompanies(companyList)
+        setCompaniesError(
+          companiesResult.error && companyList.length === 0 ? 'Gagal memuat company' : '',
+        )
       } catch (err) {
         console.error('Failed to fetch master data:', err)
+        if (isActive) {
+          setCompanies([])
+          setCompaniesError('Gagal memuat company')
+        }
+      } finally {
+        if (isActive) {
+          setCompaniesLoading(false)
+        }
       }
     }
 
     fetchData()
 
     return () => {
+      isActive = false
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose, loading])
+  }, [isOpen, onClose, loading, showAppsAccess])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -243,6 +343,8 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     setError('')
     setAppsDropdownOpen(false)
     setCompaniesDropdownOpen(false)
+    setCompaniesLoading(false)
+    setCompaniesError('')
     setDepartmentsDropdownOpen(false)
     setClassDropdownOpen(false)
     setDepartmentsSearch('')
@@ -257,7 +359,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
     setLoading(true)
     setError('')
     let submittedSuccessfully = false
-    const selectedApps = normalizeManagedUserApps(formValues.apps)
+    const selectedApps = showAppsAccess ? normalizeManagedUserApps(formValues.apps) : []
     const internalIdValue = formValues.internal_id.trim()
     const phoneValue = normalizePhoneNumber(formValues.phone)
 
@@ -279,8 +381,12 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
         job_position: formValues.job_position.trim() || null,
         job_level_id: formValues.job_level_id ? parseInt(formValues.job_level_id) : null,
         companies: formValues.company_ids.map(id => ({ id })),
+        employment_type_code: formValues.employment_type || null,
         internal_id: internalIdValue ? Number.parseInt(internalIdValue, 10) : null,
-        apps: selectedApps,
+      }
+
+      if (showAppsAccess) {
+        userData.apps = selectedApps
       }
 
       const response = await registerUser(userData)
@@ -292,6 +398,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
       setFormValues(initialFormState)
       setAppsDropdownOpen(false)
       setCompaniesDropdownOpen(false)
+      setCompaniesError('')
       setDepartmentsDropdownOpen(false)
       setClassDropdownOpen(false)
       setDepartmentsSearch('')
@@ -394,7 +501,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                 <div 
                   style={{
                     display: 'block',
-                    paddingBottom: (departmentsDropdownOpen || classDropdownOpen || companiesDropdownOpen) ? '220px' : '0px',
+                    paddingBottom: showAppsAccess && (departmentsDropdownOpen || classDropdownOpen || companiesDropdownOpen) ? '220px' : '0px',
                     transition: 'padding-bottom 0.2s ease',
                   }}
                 >
@@ -584,13 +691,21 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                             padding: '4px'
                           }}
                         >
-                          {companies.length === 0 ? (
+                          {companiesLoading ? (
+                            <div className="register-user-popup__no-options" style={{ padding: '8px 12px' }}>
+                              Memuat company...
+                            </div>
+                          ) : companiesError ? (
+                            <div className="register-user-popup__no-options" style={{ padding: '8px 12px', color: '#b91c1c' }}>
+                              {companiesError}
+                            </div>
+                          ) : companies.length === 0 ? (
                             <div className="register-user-popup__no-options" style={{ padding: '8px 12px' }}>
                               Tidak ada company tersedia
                             </div>
                           ) : (
                             companies.map((company) => {
-                              const companyId = String(company.id || company.code)
+                              const companyId = String(company.id)
                               const isSelected = formValues.company_ids.includes(companyId)
 
                               return (
@@ -628,7 +743,7 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                     {formValues.company_ids.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: '8px' }}>
                         {formValues.company_ids.map(id => {
-                          const comp = companies.find(c => String(c.id || c.code) === String(id));
+                          const comp = companies.find(c => String(c.id) === String(id));
                           return (
                             <span key={id} style={{
                               display: 'inline-flex', alignItems: 'center', background: '#f1f5f9', 
@@ -937,6 +1052,23 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                   </div>
 
                   <label className="register-user-popup__field">
+                    <span className="register-user-popup__label">Employment Type</span>
+                    <select
+                      className="register-user-popup__select"
+                      name="employment_type"
+                      value={formValues.employment_type}
+                      onChange={handleChange}
+                    >
+                      <option value="">Pilih Employment Type</option>
+                      {employmentTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="register-user-popup__field">
                     <span className="register-user-popup__label">Job Position</span>
                     <input
                       className="register-user-popup__input"
@@ -970,56 +1102,103 @@ function RegisterUserPopup({ isOpen, onClose, onSubmit }) {
                 </div>
               </div>
 
-              <section className="register-user-popup__section" aria-labelledby={appsListId} style={{ marginTop: '2rem', width: '100%' }}>
-                <div className="register-user-popup__section-header" style={{ marginBottom: '1rem' }}>
-                  <span className="register-user-popup__label" id={appsListId} style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}>
-                    Apps <span style={{ fontWeight: 'normal', color: '#64748b' }}>
-                      ({formValues.apps.length === 0 ? 'Belum ada apps dipilih' : `${formValues.apps.length} dipilih`})
+              {showAppsAccess ? (
+                <section className="register-user-popup__section" aria-labelledby={appsListId} style={{ marginTop: '2rem', width: '100%' }}>
+                  <div className="register-user-popup__section-header" style={{ marginBottom: '1rem' }}>
+                    <span className="register-user-popup__label" id={appsListId} style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}>
+                      Apps <span style={{ fontWeight: 'normal', color: '#64748b' }}>
+                        ({formValues.apps.length === 0 ? 'Belum ada apps dipilih' : `${formValues.apps.length} dipilih`})
+                      </span>
                     </span>
-                  </span>
-                </div>
+                  </div>
 
-                <div
-                  id="register-user-popup-apps-options"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                    gap: '12px',
-                    width: '100%'
-                  }}
-                >
-                  {visibleProjects.length === 0 ? (
-                    <div className="register-user-popup__no-options">
-                      Tidak ada apps tersedia
-                    </div>
-                  ) : (
-                    visibleProjects.map((project) => {
-                      const isSelected = formValues.apps.includes(project.slug)
+                  <div className="register-user-popup__dropdown-wrapper">
+                    <button
+                      type="button"
+                      className="register-user-popup__dropdown-button"
+                      onClick={() => setAppsDropdownOpen((current) => !current)}
+                      aria-expanded={appsDropdownOpen}
+                      aria-controls="register-user-popup-apps-options"
+                    >
+                      <span>
+                        {formValues.apps.length === 0
+                          ? 'Pilih Apps'
+                          : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih`}
+                      </span>
+                      <svg
+                        className={`register-user-popup__dropdown-icon ${appsDropdownOpen ? 'open' : ''}`}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <path
+                          d="M4 6L8 10L12 6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
 
-                      return (
-                        <label
-                          key={project.projectId}
-                          className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
-                          style={{ margin: 0 }}
-                        >
-                          <input
-                            type="checkbox"
-                            className="register-user-popup__apps-checkbox"
-                            name="apps"
-                            value={project.slug}
-                            checked={isSelected}
-                            onChange={handleAppsChange}
-                          />
-                          <span className="register-user-popup__apps-copy">
-                            <span>{project.name}</span>
-                            <small>{project.slug}</small>
-                          </span>
-                        </label>
-                      )
-                    })
-                  )}
-                </div>
-              </section>
+                    <p className="register-user-popup__selection-summary">
+                      {formValues.apps.length === 0
+                        ? 'Belum ada apps dipilih.'
+                        : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih.`}
+                    </p>
+
+                    {appsDropdownOpen ? (
+                      <div
+                        className="register-user-popup__apps-list"
+                        id="register-user-popup-apps-options"
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 0.5rem)',
+                          left: 0,
+                          right: 0,
+                          zIndex: 70,
+                          background: '#ffffff',
+                          border: '1px solid rgba(26, 42, 87, 0.12)',
+                          borderRadius: '14px',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem',
+                        }}
+                      >
+                        {visibleProjects.length === 0 ? (
+                          <div className="register-user-popup__no-options">
+                            Tidak ada apps tersedia
+                          </div>
+                        ) : (
+                          visibleProjects.map((project) => {
+                            const isSelected = formValues.apps.includes(project.slug)
+
+                            return (
+                              <label
+                                key={project.projectId}
+                                className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="register-user-popup__apps-checkbox"
+                                  name="apps"
+                                  value={project.slug}
+                                  checked={isSelected}
+                                  onChange={handleAppsChange}
+                                />
+                                <span className="register-user-popup__apps-copy">
+                                  <span>{project.name}</span>
+                                  <small>{project.slug}</small>
+                                </span>
+                              </label>
+                            )
+                          })
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
             </div>
           </div>
 

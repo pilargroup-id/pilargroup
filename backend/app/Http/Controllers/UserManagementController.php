@@ -191,11 +191,7 @@ class UserManagementController extends Controller
         $level = (int) $level;
         $jobPosition = trim((string) $jobPosition);
 
-        if ($level > 1) {
-            return true;
-        }
-
-        return $level === 1 && $jobPosition === self::HCGA_ALLOWED_LEVEL_1_POSITION;
+        return $level >= 1;
     }
 
     private function canHCGAManageExistingUser($user): bool
@@ -208,7 +204,7 @@ class UserManagementController extends Controller
 
     private function getHCGADeniedMessage(): string
     {
-        return 'HCGA users can only manage users with job level above 1, or level 1 with job position Admin Human Capital.';
+        return 'HCGA users can only manage users with job level 1 or above.';
     }
 
     // ─────────────────────────────────────────────

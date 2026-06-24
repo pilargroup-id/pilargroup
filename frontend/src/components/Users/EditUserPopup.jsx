@@ -138,7 +138,14 @@ function getEditFormState(user) {
   }
 }
 
-function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) {
+function EditUserPopup({
+  user,
+  isSubmitting,
+  errorMessage,
+  onClose,
+  onSubmit,
+  showAppsAccess = true,
+}) {
   const [formValues, setFormValues] = useState(() => getEditFormState(user))
   const [departments, setDepartments] = useState([])
   const [projects, setProjects] = useState([])
@@ -266,7 +273,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
       try {
         const [depts, projs, jls, comps] = await Promise.all([
           getDepartments(),
-          getProjects(),
+          showAppsAccess ? getProjects() : Promise.resolve([]),
           getJobLevels(),
           api
             .request('/master/companies')
@@ -279,21 +286,23 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
         }
 
         setDepartments(depts)
-        setProjects(projs)
+        setProjects(showAppsAccess ? projs : [])
         setJobLevels(jls)
         setCompanies(comps)
-        setFormValues((currentValues) => {
-          const resolvedApps = resolveManagedUserApps(currentValues.apps, projs)
+        if (showAppsAccess) {
+          setFormValues((currentValues) => {
+            const resolvedApps = resolveManagedUserApps(currentValues.apps, projs)
 
-          if (haveSameApps(currentValues.apps, resolvedApps)) {
-            return currentValues
-          }
+            if (haveSameApps(currentValues.apps, resolvedApps)) {
+              return currentValues
+            }
 
-          return {
-            ...currentValues,
-            apps: resolvedApps,
-          }
-        })
+            return {
+              ...currentValues,
+              apps: resolvedApps,
+            }
+          })
+        }
       } catch (error) {
         console.error('Failed to fetch user edit master data:', error)
       }
@@ -304,7 +313,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
     return () => {
       isActive = false
     }
-  }, [user])
+  }, [user, showAppsAccess])
 
   useEffect(() => {
     const nextSelectedGroups = getSelectedGroupsFromDepartments(departments, formValues.department_ids)
@@ -321,7 +330,7 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
   const rawUser = user.raw ?? {}
   const displayName =
     rawUser.name || (user.name && user.name !== '-' ? user.name : '') || rawUser.username || 'User'
-  const visibleProjects = getSelectableProjects(projects)
+  const visibleProjects = showAppsAccess ? getSelectableProjects(projects) : []
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -436,11 +445,11 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    const selectedApps = normalizeManagedUserApps(formValues.apps)
+    const selectedApps = showAppsAccess ? normalizeManagedUserApps(formValues.apps) : []
 
     onSubmit?.({
       ...formValues,
-      apps: selectedApps,
+      ...(showAppsAccess ? { apps: selectedApps } : {}),
     })
   }
 
@@ -1292,90 +1301,92 @@ function EditUserPopup({ user, isSubmitting, errorMessage, onClose, onSubmit }) 
                 </div>
               </div>
 
-              <section className="register-user-popup__section" aria-labelledby={appsListId} style={{ marginTop: '2rem', width: '100%' }}>
-                <div className="register-user-popup__section-header" style={{ marginBottom: '1rem' }}>
-                  <span
-                    className="register-user-popup__label"
-                    id={appsListId}
-                    style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}
-                  >
-                    Apps{' '}
-                    <span style={{ fontWeight: 'normal', color: '#64748b' }}>
-                      ({formValues.apps.length === 0 ? 'Belum ada apps dipilih' : `${formValues.apps.length} dipilih`})
+              {showAppsAccess ? (
+                <section className="register-user-popup__section" aria-labelledby={appsListId} style={{ marginTop: '2rem', width: '100%' }}>
+                  <div className="register-user-popup__section-header" style={{ marginBottom: '1rem' }}>
+                    <span
+                      className="register-user-popup__label"
+                      id={appsListId}
+                      style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}
+                    >
+                      Apps{' '}
+                      <span style={{ fontWeight: 'normal', color: '#64748b' }}>
+                        ({formValues.apps.length === 0 ? 'Belum ada apps dipilih' : `${formValues.apps.length} dipilih`})
+                      </span>
                     </span>
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  className="register-user-popup__dropdown-button"
-                  onClick={() => setAppsDropdownOpen((current) => !current)}
-                  aria-expanded={appsDropdownOpen}
-                  aria-controls="edit-user-popup-apps-options"
-                >
-                  <span>
-                    {formValues.apps.length === 0
-                      ? 'Pilih Apps'
-                      : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih`}
-                  </span>
-                  <svg
-                    className={`register-user-popup__dropdown-icon ${appsDropdownOpen ? 'open' : ''}`}
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                  >
-                    <path
-                      d="M4 6L8 10L12 6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-
-                <p className="register-user-popup__selection-summary">
-                  {formValues.apps.length === 0
-                    ? 'Belum ada apps dipilih.'
-                    : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih.`}
-                </p>
-
-                {appsDropdownOpen ? (
-                  <div className="register-user-popup__apps-list" id="edit-user-popup-apps-options">
-                    {visibleProjects.length === 0 ? (
-                      <div className="register-user-popup__no-options">Tidak ada apps tersedia</div>
-                    ) : (
-                      visibleProjects.map((project) => {
-                        const isSelected = formValues.apps.includes(project.slug)
-
-                        return (
-                          <label
-                            key={project.projectId}
-                            className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="register-user-popup__apps-checkbox"
-                              name="apps"
-                              value={project.slug}
-                              checked={isSelected}
-                              onChange={handleAppsChange}
-                            />
-                            <span className="register-user-popup__apps-copy">
-                              <span>{project.name}</span>
-                              <small>
-                                {project.slug}
-                                {!project.isActive ? ' - inactive' : ''}
-                              </small>
-                            </span>
-                          </label>
-                        )
-                      })
-                    )}
                   </div>
-                ) : null}
-              </section>
+
+                  <button
+                    type="button"
+                    className="register-user-popup__dropdown-button"
+                    onClick={() => setAppsDropdownOpen((current) => !current)}
+                    aria-expanded={appsDropdownOpen}
+                    aria-controls="edit-user-popup-apps-options"
+                  >
+                    <span>
+                      {formValues.apps.length === 0
+                        ? 'Pilih Apps'
+                        : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih`}
+                    </span>
+                    <svg
+                      className={`register-user-popup__dropdown-icon ${appsDropdownOpen ? 'open' : ''}`}
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                    >
+                      <path
+                        d="M4 6L8 10L12 6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <p className="register-user-popup__selection-summary">
+                    {formValues.apps.length === 0
+                      ? 'Belum ada apps dipilih.'
+                      : `${formValues.apps.length} App${formValues.apps.length > 1 ? 's' : ''} dipilih.`}
+                  </p>
+
+                  {appsDropdownOpen ? (
+                    <div className="register-user-popup__apps-list" id="edit-user-popup-apps-options">
+                      {visibleProjects.length === 0 ? (
+                        <div className="register-user-popup__no-options">Tidak ada apps tersedia</div>
+                      ) : (
+                        visibleProjects.map((project) => {
+                          const isSelected = formValues.apps.includes(project.slug)
+
+                          return (
+                            <label
+                              key={project.projectId}
+                              className={`register-user-popup__apps-item ${isSelected ? 'is-selected' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="register-user-popup__apps-checkbox"
+                                name="apps"
+                                value={project.slug}
+                                checked={isSelected}
+                                onChange={handleAppsChange}
+                              />
+                              <span className="register-user-popup__apps-copy">
+                                <span>{project.name}</span>
+                                <small>
+                                  {project.slug}
+                                  {!project.isActive ? ' - inactive' : ''}
+                                </small>
+                              </span>
+                            </label>
+                          )
+                        })
+                      )}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
           </div>
 

@@ -55,6 +55,8 @@ Route::prefix('master')
     ->group(function () {
         Route::get('/departments', [MasterController::class, 'getDepartments']);
         Route::get('/projects', [MasterController::class, 'getProjects']);
+        Route::get('/companies', [MasterController::class, 'getCompanies'])
+            ->middleware('user.management.access');
 
         // Needed by User Management form.
         // Accessible by IT and HCGA.
@@ -74,6 +76,10 @@ Route::prefix('master')
             Route::post('/job-levels', [MasterController::class, 'storeJobLevel']);
             Route::put('/job-levels/{id}', [MasterController::class, 'updateJobLevel']);
             Route::delete('/job-levels/{id}', [MasterController::class, 'destroyJobLevel']);
+
+            Route::post('/companies', [MasterController::class, 'storeCompany']);
+            Route::put('/companies/{id}', [MasterController::class, 'updateCompany']);
+            Route::delete('/companies/{id}', [MasterController::class, 'deleteCompany']);
 
             Route::get('/business-units', [BusinessUnitController::class, 'index']);
             Route::post('/business-units', [BusinessUnitController::class, 'store']);
