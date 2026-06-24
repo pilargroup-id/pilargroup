@@ -40,6 +40,7 @@ Route::prefix('users')
         Route::middleware('user.management.access')->group(function () {
             Route::get('/', [UserManagementController::class, 'index']);
             Route::post('/', [UserManagementController::class, 'store']);
+            Route::get('/export', [UserImportController::class, 'export']);
             Route::patch('/{id}/status', [UserManagementController::class, 'updateStatus']);
             Route::get('/{id}', [UserManagementController::class, 'show']);
             Route::put('/{id}', [UserManagementController::class, 'update']);

@@ -930,6 +930,45 @@ class UserImportController extends Controller
             ->toArray();
     }
 
+    private function getUserDepartmentIds(string $userId): array
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_departments')
+            ->where('user_id', $userId)
+            ->orderByRaw('is_primary DESC')
+            ->pluck('department_id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
+    }
+
+    private function getPrimaryDepartmentId(string $userId)
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_departments')
+            ->where('user_id', $userId)
+            ->orderByRaw('is_primary DESC')
+            ->value('department_id');
+    }
+
+    private function getUserCompanyIds(string $userId): array
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_companies')
+            ->where('user_id', $userId)
+            ->orderByRaw('is_primary DESC')
+            ->pluck('company_id')
+            ->toArray();
+    }
+
+    private function getPrimaryCompanyId(string $userId)
+    {
+        return DB::connection('pilargroup')
+            ->table('central_user_companies')
+            ->where('user_id', $userId)
+            ->orderByRaw('is_primary DESC')
+            ->value('company_id');
+    }
+
     // ─────────────────────────────────────────────
     // TEMPLATE REFERENCE SHEETS
     // ─────────────────────────────────────────────
@@ -1040,5 +1079,98 @@ class UserImportController extends Controller
             'status' => 'failed',
             'message' => $message,
         ];
+    }
+
+    public function export()
+    {
+        try {
+            $spreadsheet = new Spreadsheet();
+
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Users');
+
+            $headers = self::SUPPORTED_HEADERS;
+
+            foreach ($headers as $index => $header) {
+                $column = Coordinate::stringFromColumnIndex($index + 1);
+                $sheet->setCellValue("{$column}1", $header);
+            }
+
+            $users = DB::connection('pilargroup')
+                ->table('central_users as cu')
+                ->leftJoin('master_job_levels as mjl', 'cu.job_level_id', '=', 'mjl.id')
+                ->select(
+                    'cu.id',
+                    'cu.username',
+                    'cu.name',
+                    'cu.email',
+                    'cu.phone',
+                    'cu.job_position',
+                    'cu.job_level_id',
+                    'cu.employment_type_code',
+                    'cu.internal_id',
+                    'cu.is_active'
+                )
+                ->orderBy('cu.name')
+                ->get();
+
+            $rowNumber = 2;
+
+            foreach ($users as $user) {
+                $departmentIds = $this->getUserDepartmentIds($user->id);
+                $primaryDepartmentId = $this->getPrimaryDepartmentId($user->id);
+
+                $companyIds = $this->getUserCompanyIds($user->id);
+                $primaryCompanyId = $this->getPrimaryCompanyId($user->id);
+
+                $apps = $this->getUserAppSlugs($user->id);
+
+                $row = [
+                    $user->username,
+                    '', // password intentionally blank
+                    $user->name,
+                    $user->email,
+                    $user->phone,
+                    $user->job_position,
+                    $user->job_level_id,
+                    $user->employment_type_code,
+                    $user->internal_id,
+                    implode(',', $departmentIds),
+                    $primaryDepartmentId,
+                    implode(',', $companyIds),
+                    $primaryCompanyId,
+                    implode(',', $apps),
+                    $user->is_active,
+                ];
+
+                foreach ($row as $index => $value) {
+                    $column = Coordinate::stringFromColumnIndex($index + 1);
+                    $sheet->setCellValue("{$column}{$rowNumber}", $value);
+                }
+
+                $rowNumber++;
+            }
+
+            $this->autoSizeColumns($sheet, count($headers));
+
+            $this->addJobLevelsReferenceSheet($spreadsheet);
+            $this->addDepartmentsReferenceSheet($spreadsheet);
+            $this->addCompaniesReferenceSheet($spreadsheet);
+            $this->addAppsReferenceSheet($spreadsheet);
+            $this->addEmploymentTypeReferenceSheet($spreadsheet);
+
+            $fileName = 'users_export_' . now()->format('Ymd_His') . '.xlsx';
+            $filePath = storage_path("app/{$fileName}");
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($filePath);
+
+            return response()->download($filePath, $fileName)->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Error while exporting users',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
