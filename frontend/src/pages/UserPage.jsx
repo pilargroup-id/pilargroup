@@ -11,6 +11,8 @@ import {
   getManagedUsers,
   updateManagedUser,
   updateManagedUserStatus,
+  downloadUserImportTemplate,
+  importUsers,
 } from '@/services/manageUsers'
 import { getStoredUser } from '@/services/api'
 import { canManageUserTarget, isITUser } from '@/services/accessControl'
@@ -102,6 +104,7 @@ function UserPage() {
   const [isUpdatingUser, setIsUpdatingUser] = useState(false)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
   const [updatingStatusUserIds, setUpdatingStatusUserIds] = useState([])
+  const [isUploading, setIsUploading] = useState(false)
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
   const accessUser = getStoredUser()
   const canManageApps = isITUser(accessUser)
@@ -131,6 +134,31 @@ function UserPage() {
   const handleRefresh = () => {
     setSearchQuery('')
     void loadUsers()
+  }
+
+  const handleDownloadTemplate = async () => {
+    try {
+      await downloadUserImportTemplate()
+    } catch (error) {
+      const msg = error?.message || 'Failed to download template.'
+      setUsersError(msg)
+      window.alert(msg)
+    }
+  }
+
+  const handleUploadUsers = async (file) => {
+    try {
+      setIsUploading(true)
+      const result = await importUsers(file)
+      window.alert(result?.message || 'Users imported successfully.')
+      await loadUsers()
+    } catch (error) {
+      const msg = error?.message || 'Failed to import users.'
+      setUsersError(msg)
+      window.alert(msg)
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleRegisterUser = async () => {
@@ -359,6 +387,9 @@ function UserPage() {
             canEditUser={canEditManagedUser}
             canDeleteUser={() => canDeleteUsers}
             updatingStatusUserIds={updatingStatusUserIds}
+            onDownloadTemplate={handleDownloadTemplate}
+            onUploadUsers={handleUploadUsers}
+            isUploading={isUploading}
           />
         </article>
       </section>

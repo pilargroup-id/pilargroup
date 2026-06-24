@@ -1,4 +1,4 @@
-import api from '@/services/api'
+import api, { getToken, API_BASE_URL } from '@/services/api'
 
 const USERS_PATH = '/users'
 const relativeTimeFormatter =
@@ -386,6 +386,49 @@ export async function updateManagedUserStatus(id, isActive) {
   return payload
 }
 
+export async function downloadUserImportTemplate() {
+  const url = `${API_BASE_URL}${USERS_PATH}/import-template`
+  const token = getToken()
+  const headers = new Headers()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(url, { method: 'GET', headers })
+  if (!response.ok) {
+    let errorMessage = 'Failed to download template'
+    try {
+      const errorData = await response.json()
+      if (errorData?.message) errorMessage = errorData.message
+    } catch {
+      // Ignored
+    }
+    throw new Error(errorMessage)
+  }
+
+  const blob = await response.blob()
+  const objectUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.setAttribute('download', 'users_import_template.xlsx')
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
+}
+
+export async function importUsers(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const payload = await api.request(`${USERS_PATH}/import`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  return payload
+}
+
 export async function deleteManagedUser(id) {
   const payload = await api.request(`${USERS_PATH}/${id}`, {
     method: 'DELETE',
@@ -405,6 +448,8 @@ const manageUsersService = {
   normalizeUsers: normalizeManagedUsers,
   normalizeUserApps: normalizeManagedUserApps,
   resolveUserApps: resolveManagedUserApps,
+  downloadImportTemplate: downloadUserImportTemplate,
+  importUsers,
 }
 
 export default manageUsersService

@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Edit03, Trash03 } from '@untitledui/icons'
+import { Fragment, useEffect, useMemo, useState, useRef } from 'react'
+import { ChevronDown, Edit03, Trash03, DownloadCloud02, UploadCloud02 } from '@untitledui/icons'
 
 const DEFAULT_USERS_PER_PAGE = 10
 const EMPTY_FILTERS = {
@@ -383,7 +383,11 @@ function TableUser({
   canEditUser = () => true,
   canDeleteUser = () => true,
   updatingStatusUserIds = [],
+  onDownloadTemplate,
+  onUploadUsers,
+  isUploading = false,
 }) {
+  const fileInputRef = useRef(null)
   const [expandedUserId, setExpandedUserId] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [currentPage, setCurrentPage] = useState(1)
@@ -504,6 +508,22 @@ function TableUser({
     setFilters(EMPTY_FILTERS)
   }
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    onUploadUsers?.(file)
+    
+    // Reset input so the same file can be selected again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const renderFilterSelect = (filterKey, label, options) => (
     <label className="users-table-filter__field">
       <span className="users-table-filter__label">{label}</span>
@@ -534,14 +554,44 @@ function TableUser({
           {renderFilterSelect('status', 'Status', filterOptions.status)}
         </div>
 
-        <button
-          type="button"
-          className="users-table-filter__clear"
-          onClick={handleClearFilters}
-          disabled={!hasActiveFilters}
-        >
-          Clear filters
-        </button>
+        <div className="users-table-filter__actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+          <button
+            type="button"
+            className="users-table-filter__clear"
+            onClick={handleClearFilters}
+            disabled={!hasActiveFilters}
+          >
+            Clear filters
+          </button>
+          
+          <button
+            type="button"
+            className="users-table-filter__clear"
+            onClick={onDownloadTemplate}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}
+          >
+            <DownloadCloud02 size={16} />
+            Download Template
+          </button>
+
+          <button
+            type="button"
+            className="users-table-filter__clear"
+            onClick={handleUploadClick}
+            disabled={isUploading}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <UploadCloud02 size={16} />
+            {isUploading ? 'Uploading...' : 'Upload'}
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
+        </div>
       </div>
 
       <div className="users-table-wrapper">
