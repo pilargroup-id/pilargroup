@@ -386,6 +386,7 @@ function TableUser({
   onDownloadTemplate,
   onUploadUsers,
   isUploading = false,
+  showImportExport = false,
 }) {
   const fileInputRef = useRef(null)
   const [expandedUserId, setExpandedUserId] = useState(null)
@@ -564,33 +565,37 @@ function TableUser({
             Clear filters
           </button>
           
-          <button
-            type="button"
-            className="users-table-filter__clear"
-            onClick={onDownloadTemplate}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}
-          >
-            <DownloadCloud02 size={16} />
-            Download Template
-          </button>
+          {showImportExport && (
+            <>
+              <button
+                type="button"
+                className="users-table-filter__clear"
+                onClick={onDownloadTemplate}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}
+              >
+                <DownloadCloud02 size={16} />
+                Download Template
+              </button>
 
-          <button
-            type="button"
-            className="users-table-filter__clear"
-            onClick={handleUploadClick}
-            disabled={isUploading}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <UploadCloud02 size={16} />
-            {isUploading ? 'Uploading...' : 'Upload'}
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".xlsx,.xls,.csv"
-            style={{ display: 'none' }}
-          />
+              <button
+                type="button"
+                className="users-table-filter__clear"
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <UploadCloud02 size={16} />
+                {isUploading ? 'Uploading...' : 'Upload'}
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".xlsx,.xls,.csv"
+                style={{ display: 'none' }}
+              />
+            </>
+          )}
         </div>
       </div>
 

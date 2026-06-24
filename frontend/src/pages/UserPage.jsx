@@ -390,6 +390,7 @@ function UserPage() {
             onDownloadTemplate={handleDownloadTemplate}
             onUploadUsers={handleUploadUsers}
             isUploading={isUploading}
+            showImportExport={canManageApps}
           />
         </article>
       </section>
