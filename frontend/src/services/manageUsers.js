@@ -429,6 +429,56 @@ export async function importUsers(file) {
   return payload
 }
 
+export async function downloadUsersExport() {
+  const url = `${API_BASE_URL}${USERS_PATH}/export`
+  const token = getToken()
+  const headers = new Headers()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(url, { method: 'GET', headers })
+  if (!response.ok) {
+    if (response.status === 401) {
+       // Typically handled by API client but here we use fetch
+       throw new Error('Unauthorized')
+    }
+    if (response.status === 403) {
+       throw new Error('Forbidden')
+    }
+    let errorMessage = 'Failed to download export'
+    try {
+      const errorData = await response.json()
+      if (errorData?.message) errorMessage = errorData.message
+    } catch {
+      // Ignored
+    }
+    throw new Error(errorMessage)
+  }
+
+  const blob = await response.blob()
+  const objectUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  
+  // Try to get filename from content-disposition header if available, otherwise default
+  let filename = 'users_export.xlsx'
+  const disposition = response.headers.get('content-disposition')
+  if (disposition && disposition.indexOf('attachment') !== -1) {
+    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+    const matches = filenameRegex.exec(disposition)
+    if (matches != null && matches[1]) { 
+      filename = matches[1].replace(/['"]/g, '')
+    }
+  }
+
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
+}
+
 export async function deleteManagedUser(id) {
   const payload = await api.request(`${USERS_PATH}/${id}`, {
     method: 'DELETE',
@@ -450,6 +500,7 @@ const manageUsersService = {
   resolveUserApps: resolveManagedUserApps,
   downloadImportTemplate: downloadUserImportTemplate,
   importUsers,
+  downloadUsersExport,
 }
 
 export default manageUsersService

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus01 } from '@untitledui/icons'
+import { UserPlus01, DownloadCloud02 } from '@untitledui/icons'
 
 import AppLayout from '@/layouts/AppLayout'
 import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
@@ -13,6 +13,7 @@ import {
   updateManagedUserStatus,
   downloadUserImportTemplate,
   importUsers,
+  downloadUsersExport,
 } from '@/services/manageUsers'
 import { getStoredUser } from '@/services/api'
 import { canManageUserTarget, isITUser } from '@/services/accessControl'
@@ -141,6 +142,16 @@ function UserPage() {
       await downloadUserImportTemplate()
     } catch (error) {
       const msg = error?.message || 'Failed to download template.'
+      setUsersError(msg)
+      window.alert(msg)
+    }
+  }
+
+  const handleExportUsers = async () => {
+    try {
+      await downloadUsersExport()
+    } catch (error) {
+      const msg = error?.message || 'Failed to export users.'
       setUsersError(msg)
       window.alert(msg)
     }
@@ -367,14 +378,25 @@ function UserPage() {
               <h2 className="dashboard-panel__title">Users Table</h2>
             </div>
 
-            <button
-              type="button"
-              className="users-table-card__action"
-              onClick={() => setIsRegisterPopupOpen(true)}
-            >
-              <UserPlus01 size={18} aria-hidden="true" />
-              Registrasi User
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="users-table-card__action"
+                style={{ background: '#fff', color: '#1a2a57', border: '1px solid rgba(26, 42, 87, 0.12)', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                onClick={handleExportUsers}
+              >
+                <DownloadCloud02 size={18} aria-hidden="true" />
+                Export xlsx
+              </button>
+              <button
+                type="button"
+                className="users-table-card__action"
+                onClick={() => setIsRegisterPopupOpen(true)}
+              >
+                <UserPlus01 size={18} aria-hidden="true" />
+                Registrasi User
+              </button>
+            </div>
           </div>
 
           <TableUser
