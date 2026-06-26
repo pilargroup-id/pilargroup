@@ -131,6 +131,7 @@ function DashboardPage({ activePath = '/dashboard' }) {
 
   return (
     <AppLayout
+      className="users-page-layout"
       headerProps={{
         title: 'Pilargroup',
         subtitle: 'Manage your recruitment process',
@@ -150,14 +151,14 @@ function DashboardPage({ activePath = '/dashboard' }) {
         activePath,
       }}
     >
-      <section className="dashboard-content">
+      <section className="dashboard-content users-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {launchError ? (
-          <div className="master-departments-feedback master-departments-feedback--error">
+          <div className="master-departments-feedback master-departments-feedback--error" style={{ flexShrink: 0 }}>
             {launchError}
           </div>
         ) : null}
 
-        <div className="dashboard-overview">{content}</div>
+        <div className="dashboard-overview hide-scrollbar" style={{ overflowY: 'auto', flex: 1, paddingRight: '8px', paddingBottom: '24px', alignContent: 'start' }}>{content}</div>
       </section>
     </AppLayout>
   )

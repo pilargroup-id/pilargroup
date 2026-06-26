@@ -1086,6 +1086,17 @@
   gap: 20px;
 }
 
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .dashboard-card,
 .dashboard-panel {
   border: 1px solid rgba(26, 42, 87, 0.08);
