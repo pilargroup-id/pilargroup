@@ -107,6 +107,7 @@ Route::prefix('internal')
     ->group(function () {
         Route::get('/directory/users', [DirectoryController::class, 'users']);
         Route::get('/directory/departments', [DirectoryController::class, 'departments']);
+        Route::get('/directory/companies', [DirectoryController::class, 'companies']);
         Route::get('/directory/business-units', [DirectoryController::class, 'businessUnits']);
         Route::get('/directory/business-units/{id}/departments', [DirectoryController::class, 'businessUnitDepartments']);
     });

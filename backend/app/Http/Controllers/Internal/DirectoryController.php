@@ -111,6 +111,41 @@ class DirectoryController extends Controller
         ]);
     }
 
+    public function companies(Request $request)
+    {
+        $active = $request->query('active', 1);
+        $search = $request->query('search');
+
+        $query = DB::connection('pilargroup')
+            ->table('master_companies')
+            ->select([
+                'id',
+                'code',
+                'name',
+                'is_active',
+            ]);
+
+        if ($active !== null && $active !== 'all') {
+            $query->where('is_active', (int) $active);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        $companies = $query
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'message' => 'Companies fetched successfully',
+            'data' => $companies,
+        ]);
+    }
+
     public function businessUnits(Request $request)
     {
         $companyId = $request->query('company_id');
