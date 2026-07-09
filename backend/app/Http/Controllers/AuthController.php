@@ -44,13 +44,65 @@ class AuthController extends Controller
             ->where('cu.id', $user->id)
             ->first();
 
-        // Multi-department
+        // Multi-department + parent/class context
         $departments = DB::connection('pilargroup')
             ->table('central_user_departments as cud')
             ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
+            ->leftJoin('master_departments as parent_md', 'md.parent_id', '=', 'parent_md.id')
             ->where('cud.user_id', $user->id)
-            ->select('md.id', 'md.name', 'md.class', 'md.code', 'cud.is_primary')
+            ->select(
+                'md.id',
+                'md.name',
+                'md.class',
+                'md.code',
+                'md.parent_id',
+                'parent_md.id as parent_department_id',
+                'parent_md.name as parent_department_name',
+                'parent_md.class as parent_department_class',
+                'parent_md.code as parent_department_code',
+                'cud.is_primary'
+            )
             ->get()
+            ->map(function ($department) {
+                $isChildDepartment = !empty($department->parent_id);
+
+                return [
+                    // Existing fields - keep backward compatible
+                    'id' => $department->id,
+                    'name' => $department->name,
+                    'class' => $department->class,
+                    'code' => $department->code,
+                    'is_primary' => $department->is_primary,
+
+                    // Parent info - additive
+                    'parent_id' => $department->parent_id,
+                    'parent_name' => $department->parent_department_name,
+                    'parent_class' => $department->parent_department_class,
+                    'parent_code' => $department->parent_department_code,
+
+                    // Department context for apps that need parent/class split
+                    // If md is child, department = parent, class = child.
+                    // If md is parent/no child, department = md, class = md.
+                    'department_id' => $isChildDepartment
+                        ? $department->parent_department_id
+                        : $department->id,
+                    'department_name' => $isChildDepartment
+                        ? $department->parent_department_name
+                        : $department->name,
+                    'department_class' => $isChildDepartment
+                        ? $department->parent_department_class
+                        : $department->class,
+                    'department_code' => $isChildDepartment
+                        ? $department->parent_department_code
+                        : $department->code,
+
+                    'class_department_id' => $department->id,
+                    'class_name' => $department->name,
+                    'class_class' => $department->class,
+                    'class_code' => $department->code,
+                ];
+            })
+            ->values()
             ->toArray();
 
         // Multi-company
@@ -65,27 +117,47 @@ class AuthController extends Controller
         $apps = $this->getUserApps($user->id);
 
         // Primary department & company untuk backward-compat di JWT claim
-        $primaryDept    = collect($departments)->firstWhere('is_primary', 1) ?? ($departments[0] ?? null);
-        $primaryCompany = collect($companies)->firstWhere('is_primary', 1)   ?? ($companies[0] ?? null);
+        $primaryDept = collect($departments)->firstWhere('is_primary', 1) ?? ($departments[0] ?? null);
+        $primaryCompany = collect($companies)->firstWhere('is_primary', 1) ?? ($companies[0] ?? null);
 
         return [
-            'id'            => $userProfile?->id            ?? $user->id,
-            'internal_id'   => $userProfile?->internal_id   ?? $user->internal_id,
-            'username'      => $userProfile?->username       ?? $user->username,
-            'name'          => $userProfile?->name           ?? $user->name,
-            'email'         => $userProfile?->email          ?? $user->email,
-            'phone'         => $userProfile?->phone          ?? $user->phone,
-            'departments'   => $departments,
-            'companies'     => $companies,
-            'department_id' => $primaryDept?->id   ?? null,
-            'department'    => $primaryDept?->name ?? null,
-            'company_id'    => $primaryCompany?->id   ?? null,
-            'company'       => $primaryCompany?->name ?? null,
-            'job_position'  => $userProfile?->job_position   ?? $user->job_position,
-            'job_level'     => $userProfile?->job_level      ?? null,
+            'id' => $userProfile?->id ?? $user->id,
+            'internal_id' => $userProfile?->internal_id ?? $user->internal_id,
+            'username' => $userProfile?->username ?? $user->username,
+            'name' => $userProfile?->name ?? $user->name,
+            'email' => $userProfile?->email ?? $user->email,
+            'phone' => $userProfile?->phone ?? $user->phone,
+
+            'departments' => $departments,
+            'companies' => $companies,
+
+            // Existing top-level fields - keep backward compatible
+            'department_id' => $primaryDept['id'] ?? null,
+            'department' => $primaryDept['name'] ?? null,
+            'company_id' => $primaryCompany?->id ?? null,
+            'company' => $primaryCompany?->name ?? null,
+
+            // Additive top-level department info
+            'department_code' => $primaryDept['code'] ?? null,
+            'department_class' => $primaryDept['class'] ?? null,
+            'parent_department_id' => $primaryDept['parent_id'] ?? null,
+            'parent_department_name' => $primaryDept['parent_name'] ?? null,
+
+            // Additive top-level context for apps like Papertrail
+            'context_department_id' => $primaryDept['department_id'] ?? null,
+            'context_department_name' => $primaryDept['department_name'] ?? null,
+            'context_department_class' => $primaryDept['department_class'] ?? null,
+            'context_department_code' => $primaryDept['department_code'] ?? null,
+            'class_department_id' => $primaryDept['class_department_id'] ?? null,
+            'class_name' => $primaryDept['class_name'] ?? null,
+            'class_class' => $primaryDept['class_class'] ?? null,
+            'class_code' => $primaryDept['class_code'] ?? null,
+
+            'job_position' => $userProfile?->job_position ?? $user->job_position,
+            'job_level' => $userProfile?->job_level ?? null,
             'job_level_value' => $userProfile?->job_level_value ?? null,
-            'apps'          => $apps,
-            'cv'            => $userProfile?->token_version  ?? $user->token_version,
+            'apps' => $apps,
+            'cv' => $userProfile?->token_version ?? $user->token_version,
         ];
     }
 
