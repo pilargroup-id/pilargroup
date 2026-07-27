@@ -1603,6 +1603,57 @@
   gap: 1.25rem;
 }
 
+.users-table-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.users-table-card__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: clamp(220px, 22vw, 300px);
+}
+
+.users-table-card__search-icon {
+  position: absolute;
+  left: 0.95rem;
+  color: #667085;
+  pointer-events: none;
+}
+
+.users-table-card__search-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 1rem 0 2.65rem;
+  border: 1px solid rgba(26, 42, 87, 0.12);
+  border-radius: 999px;
+  background: #fff;
+  color: #33415f;
+  font: inherit;
+  font-size: 0.95rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.users-table-card__search-input::placeholder {
+  color: #98a2b3;
+}
+
+.users-table-card__search-input:focus {
+  outline: none;
+  border-color: rgba(42, 157, 143, 0.46);
+  box-shadow: 0 0 0 4px rgba(42, 157, 143, 0.12);
+}
+
+.users-table-card__search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
 .users-table-card__description {
   margin: 0;
   color: #5a6b88;
@@ -2339,10 +2390,44 @@
   margin-top: 18px;
 }
 
+.users-table-pagination__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
 .users-table-pagination__summary {
   margin: 0;
   color: #5a6b88;
   font-size: 0.92rem;
+}
+
+.users-table-pagination__page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #5a6b88;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.users-table-pagination__page-size-select {
+  height: 38px;
+  min-width: 76px;
+  padding: 0 2rem 0 0.8rem;
+  border: 1px solid rgba(26, 42, 87, 0.12);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--primary-blue);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.users-table-pagination__page-size-select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(42, 157, 143, 0.14);
 }
 
 .users-table-pagination__controls {
@@ -2354,17 +2439,18 @@
 }
 
 .users-table-pagination__button {
-  min-width: 42px;
-  min-height: 42px;
+  width: 42px;
+  height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 0.95rem;
+  padding: 0;
   border: 1px solid rgba(26, 42, 87, 0.12);
-  border-radius: 12px;
+  border-radius: 50%;
   background: #fff;
   color: var(--primary-blue);
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -2372,6 +2458,10 @@
     border-color 0.2s ease,
     transform 0.2s ease,
     box-shadow 0.2s ease;
+}
+
+.users-table-pagination__button--icon svg {
+  flex-shrink: 0;
 }
 
 .users-table-pagination__button:hover:not(:disabled) {
@@ -3391,6 +3481,11 @@
     width: 100%;
   }
 
+  .users-table-card__actions,
+  .users-table-card__search {
+    width: 100%;
+  }
+
   .users-table-filter {
     align-items: stretch;
     flex-direction: column;
@@ -3408,7 +3503,7 @@
     align-items: stretch;
   }
 
-  .users-table-pagination__summary,
+  .users-table-pagination__meta,
   .users-table-pagination__controls {
     width: 100%;
   }
