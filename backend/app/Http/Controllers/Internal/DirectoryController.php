@@ -18,6 +18,7 @@ class DirectoryController extends Controller
 
         $query = DB::connection('pilargroup')
             ->table('central_users as cu')
+            ->leftJoin('master_job_levels as mjl', 'cu.job_level_id', '=', 'mjl.id')
             ->leftJoin('central_user_departments as cud', 'cud.user_id', '=', 'cu.id')
             ->leftJoin('master_departments as md', 'md.id', '=', 'cud.department_id')
             ->select([
@@ -29,6 +30,9 @@ class DirectoryController extends Controller
                 'cu.name',
                 'cu.job_position',
                 'cu.job_level_id',
+                'mjl.name as job_level',
+                'mjl.level as job_level_value',
+                'cu.employment_type_code',
                 'cu.is_active',
                 'md.id as department_id',
                 'md.name as department_name',
