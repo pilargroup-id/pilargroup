@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { UserPlus01, DownloadCloud02 } from '@untitledui/icons'
+import { UserPlus01, DownloadCloud02, SearchMd } from '@untitledui/icons'
 
 import AppLayout from '@/layouts/AppLayout'
-import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import TableUser from '@/components/Users/TableUser'
 import { normalizePhoneNumber } from '@/utils/normalizePhoneNumber'
@@ -21,7 +20,7 @@ import RegisterUserPopup from '@/components/Users/RegisterUserPopup'
 import EditUserPopup from '@/components/Users/EditUserPopup'
 import DeleteUserPopup from '@/components/Users/DeleteUserPopup'
 
-const USERS_PER_PAGE = 10
+const USERS_PER_PAGE = 25
 
 function getManagedUserId(user) {
   return user?.raw?.id ?? user?.userId ?? null
@@ -355,13 +354,7 @@ function UserPage() {
       headerProps={{
         title: 'Pilargroup',
         subtitle: 'Manage your recruitment process',
-        breadcrumb: sharedBreadcrumbItems,
-        searchProps: {
-          value: searchQuery,
-          placeholder: 'Search users...',
-          onChange: (event) => setSearchQuery(event.target.value),
-          ariaLabel: 'Search users',
-        },
+        hideBreadcrumb: true,
         notificationProps: {
           ariaLabel: 'Open notifications',
           modalTitle: 'Notifications',
@@ -378,7 +371,23 @@ function UserPage() {
               <h2 className="dashboard-panel__title">Users Table</h2>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="users-table-card__actions">
+              <label
+                className="users-table-card__search"
+                aria-label="Search users"
+              >
+                <SearchMd size={16} className="users-table-card__search-icon" />
+                <input
+                  type="search"
+                  className="users-table-card__search-input"
+                  value={searchQuery}
+                  placeholder="Search users..."
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  aria-label="Search users"
+                  autoComplete="off"
+                />
+              </label>
+
               <button
                 type="button"
                 className="users-table-card__action"

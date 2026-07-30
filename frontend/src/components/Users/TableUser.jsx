@@ -1,7 +1,16 @@
 import { Fragment, useEffect, useMemo, useState, useRef } from 'react'
-import { ChevronDown, Edit03, Trash03, DownloadCloud02, UploadCloud02 } from '@untitledui/icons'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Edit03,
+  Trash03,
+  DownloadCloud02,
+  UploadCloud02,
+} from '@untitledui/icons'
 
-const DEFAULT_USERS_PER_PAGE = 10
+const ROWS_PER_PAGE_OPTIONS = [25, 100, 250]
+const DEFAULT_USERS_PER_PAGE = ROWS_PER_PAGE_OPTIONS[0]
 const EMPTY_FILTERS = {
   company: '',
   department: '',
@@ -212,6 +221,10 @@ function getPaginationItems(currentPage, totalPages) {
   return paginationItems
 }
 
+function getSafeUsersPerPage(value) {
+  return ROWS_PER_PAGE_OPTIONS.includes(value) ? value : DEFAULT_USERS_PER_PAGE
+}
+
 function getUniqueOptions(users, getValues) {
   const optionsByKey = new Map()
 
@@ -392,6 +405,7 @@ function TableUser({
   const [expandedUserId, setExpandedUserId] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [currentPage, setCurrentPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(() => getSafeUsersPerPage(usersPerPage))
   const visibleUserIdsKey = users.map((user) => user.userId).join('|')
   const hasActiveFilters = Object.values(filters).some(Boolean)
 
@@ -422,12 +436,12 @@ function TableUser({
     [filters, users],
   )
 
-  const internalPaginationEnabled = !pagination && usersPerPage > 0
+  const internalPaginationEnabled = !pagination && rowsPerPage > 0
   const totalUsers = filteredUsers.length
-  const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage))
+  const totalPages = Math.max(1, Math.ceil(totalUsers / rowsPerPage))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-  const pageStartIndex = internalPaginationEnabled ? (safeCurrentPage - 1) * usersPerPage : 0
-  const pageEndIndex = internalPaginationEnabled ? pageStartIndex + usersPerPage : totalUsers
+  const pageStartIndex = internalPaginationEnabled ? (safeCurrentPage - 1) * rowsPerPage : 0
+  const pageEndIndex = internalPaginationEnabled ? pageStartIndex + rowsPerPage : totalUsers
   const visibleUsers = internalPaginationEnabled
     ? filteredUsers.slice(pageStartIndex, pageEndIndex)
     : filteredUsers
@@ -507,6 +521,12 @@ function TableUser({
 
   const handleClearFilters = () => {
     setFilters(EMPTY_FILTERS)
+  }
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(Number(event.target.value))
+    setCurrentPage(1)
+    setExpandedUserId(null)
   }
 
   const handleUploadClick = () => {
@@ -795,16 +815,37 @@ function TableUser({
 
       {tablePagination ? (
         <div className="users-table-pagination">
-          <p className="users-table-pagination__summary">{tablePagination.summary}</p>
+          <div className="users-table-pagination__meta">
+            <p className="users-table-pagination__summary">{tablePagination.summary}</p>
+
+            {internalPaginationEnabled ? (
+              <label className="users-table-pagination__page-size">
+                <span className="users-table-pagination__page-size-label">Rows per page</span>
+                <select
+                  className="users-table-pagination__page-size-select"
+                  value={rowsPerPage}
+                  onChange={handleRowsPerPageChange}
+                >
+                  {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
 
           <div className="users-table-pagination__controls" aria-label="Users pagination">
             <button
               type="button"
-              className="users-table-pagination__button"
+              className="users-table-pagination__button users-table-pagination__button--icon"
               onClick={tablePagination.onPrevious}
               disabled={tablePagination.currentPage === 1}
+              aria-label="Previous page"
+              title="Previous page"
             >
-              Previous
+              <ChevronLeft size={18} aria-hidden="true" />
             </button>
 
             {tablePagination.items.map((item) =>
@@ -831,11 +872,13 @@ function TableUser({
 
             <button
               type="button"
-              className="users-table-pagination__button"
+              className="users-table-pagination__button users-table-pagination__button--icon"
               onClick={tablePagination.onNext}
               disabled={tablePagination.currentPage === tablePagination.totalPages}
+              aria-label="Next page"
+              title="Next page"
             >
-              Next
+              <ChevronRight size={18} aria-hidden="true" />
             </button>
           </div>
         </div>

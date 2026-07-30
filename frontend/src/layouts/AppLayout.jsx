@@ -162,6 +162,7 @@ function AppLayout({
       <div className="dashboard-stage">
         <Header
           {...headerProps}
+          hideBreadcrumb={headerProps.hideBreadcrumb}
           directoryProps={{
             rootLabel: headerProps.title ?? 'Pilargroup',
             currentLabel: activePageLabel,
