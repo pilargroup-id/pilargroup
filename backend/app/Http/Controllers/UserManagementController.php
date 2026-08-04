@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Services\SnipeItService;
-use App\Services\TicketService;
 
 class UserManagementController extends Controller
 {
@@ -422,10 +421,6 @@ class UserManagementController extends Controller
 
             (new SnipeItService())->syncUser($newUser, $deptName, $jobLevelName);
 
-            if ($isIT && in_array('ticket', $request->input('apps', []))) {
-                (new TicketService())->syncUser($newUser, $deptName);
-            }
-
             return response()->json([
                 'message' => 'User berhasil dibuat',
                 'user_id' => $userId,
@@ -653,7 +648,6 @@ class UserManagementController extends Controller
                 ->increment('token_version');
 
             (new SnipeItService())->forceRelogin($updatedUser->username);
-            (new TicketService())->forceLogout($id);
         }
 
         $snipeRelevant = isset($updates['username'])
@@ -676,18 +670,6 @@ class UserManagementController extends Controller
             }
 
             (new SnipeItService())->syncUser($updatedUser, $snipeDept, $snipeJobLevel, $oldUsername);
-        }
-
-        $finalApps = DB::connection('pilargroup')
-            ->table('central_user_projects as cup')
-            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
-            ->where('cup.user_id', $id)
-            ->pluck('mp.slug')
-            ->toArray();
-
-        if (in_array('ticket', $finalApps)) {
-            $ticketDept = $this->getPrimaryDepartmentName($id);
-            (new TicketService())->syncUser($updatedUser, $ticketDept, $oldUsername);
         }
 
         return response()->json(['message' => 'User berhasil diupdate']);
@@ -754,13 +736,6 @@ class UserManagementController extends Controller
 
         $username = $user->username;
 
-        $userApps = DB::connection('pilargroup')
-            ->table('central_user_projects as cup')
-            ->join('master_projects as mp', 'cup.project_id', '=', 'mp.id')
-            ->where('cup.user_id', $id)
-            ->pluck('mp.slug')
-            ->toArray();
-
         try {
             DB::connection('pilargroup')->transaction(function () use ($id) {
                 DB::connection('pilargroup')->table('central_user_departments')->where('user_id', $id)->delete();
@@ -768,10 +743,6 @@ class UserManagementController extends Controller
                 DB::connection('pilargroup')->table('central_user_projects')->where('user_id', $id)->delete();
                 DB::connection('pilargroup')->table('central_users')->where('id', $id)->delete();
             });
-
-            if (in_array('ticket', $userApps)) {
-                (new TicketService())->deleteUser($username);
-            }
 
             (new SnipeItService())->deleteUser($username);
 

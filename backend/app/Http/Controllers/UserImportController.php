@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\SnipeItService;
-use App\Services\TicketService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -95,21 +96,32 @@ class UserImportController extends Controller
     }
 
     // ─────────────────────────────────────────────
-    // POST /api/users/import
+    // POST /api/users/import/preview
     // ─────────────────────────────────────────────
-    public function import(Request $request)
+    public function preview(Request $request)
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv',
         ]);
 
-        try {
-            $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
-            $sheet = $spreadsheet->getSheetByName(self::USER_SHEET_NAME) ?? $spreadsheet->getActiveSheet();
+        $batchId = Str::uuid()->toString();
+        $batchDirectory = $this->getBatchDirectory($batchId);
 
+        try {
+            File::ensureDirectoryExists($batchDirectory);
+
+            $sourceExtension = strtolower($request->file('file')->getClientOriginalExtension() ?: 'xlsx');
+            $sourceFileName = "source.{$sourceExtension}";
+            $sourcePath = $batchDirectory . DIRECTORY_SEPARATOR . $sourceFileName;
+            $request->file('file')->move($batchDirectory, $sourceFileName);
+
+            $spreadsheet = IOFactory::load($sourcePath);
+            $sheet = $spreadsheet->getSheetByName(self::USER_SHEET_NAME) ?? $spreadsheet->getActiveSheet();
             $headerMap = $this->getHeaderMap($sheet);
 
             if (!isset($headerMap['username'])) {
+                File::deleteDirectory($batchDirectory);
+
                 return response()->json([
                     'message' => 'Invalid import file. Header username is required.',
                 ], 422);
@@ -118,6 +130,8 @@ class UserImportController extends Controller
             $unknownHeaders = array_values(array_diff(array_keys($headerMap), self::SUPPORTED_HEADERS));
 
             if (count($unknownHeaders) > 0) {
+                File::deleteDirectory($batchDirectory);
+
                 return response()->json([
                     'message' => 'Invalid import file. Unknown header found.',
                     'unknown_headers' => $unknownHeaders,
@@ -125,16 +139,19 @@ class UserImportController extends Controller
                 ], 422);
             }
 
+            $rows = [];
+            $seenUsernames = [];
+            $seenInternalIds = [];
             $highestRow = $sheet->getHighestDataRow();
 
             $summary = [
-                'created' => 0,
-                'updated' => 0,
-                'skipped' => 0,
-                'failed' => 0,
+                'total' => 0,
+                'valid' => 0,
+                'invalid' => 0,
+                'create' => 0,
+                'update' => 0,
+                'skip' => 0,
             ];
-
-            $results = [];
 
             for ($rowNumber = 2; $rowNumber <= $highestRow; $rowNumber++) {
                 $rowData = $this->getRowData($sheet, $headerMap, $rowNumber);
@@ -143,23 +160,497 @@ class UserImportController extends Controller
                     continue;
                 }
 
-                $result = $this->processRow($rowData, $rowNumber);
+                $summary['total']++;
+                $previewRow = $this->buildPreviewRow(
+                    $rowData,
+                    $rowNumber,
+                    $seenUsernames,
+                    $seenInternalIds
+                );
 
-                $summary[$result['status']]++;
-                $results[] = $result;
+                if ($previewRow['status'] === 'INVALID') {
+                    $summary['invalid']++;
+                } else {
+                    $summary['valid']++;
+                    $summary[strtolower($previewRow['action'])]++;
+                }
+
+                $rows[] = $previewRow;
+            }
+
+            $batch = [
+                'batch_id' => $batchId,
+                'created_by' => (string) $request->user_id,
+                'status' => 'PREVIEWED',
+                'original_filename' => $request->file('file')->getClientOriginalName(),
+                'source_file' => $sourceFileName,
+                'created_at' => now()->toIso8601String(),
+                'expires_at' => now()->addHours(2)->toIso8601String(),
+                'summary' => $summary,
+                'rows' => $rows,
+            ];
+
+            $this->writeBatch($batchId, $batch);
+
+            if ($summary['invalid'] > 0) {
+                $this->writeInvalidWorkbook($batchId, $rows);
             }
 
             return response()->json([
-                'message' => 'User import finished',
+                'message' => 'User import preview generated',
+                'batch_id' => $batchId,
+                'expires_at' => $batch['expires_at'],
                 'summary' => $summary,
-                'results' => $results,
+                'rows' => array_map(fn (array $row) => $this->sanitizePreviewRow($row), $rows),
             ]);
         } catch (\Throwable $e) {
+            File::deleteDirectory($batchDirectory);
+
             return response()->json([
-                'message' => 'Error while importing users',
+                'message' => 'Error while generating user import preview',
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    // ─────────────────────────────────────────────
+    // POST /api/users/import/{batchId}/commit
+    // ─────────────────────────────────────────────
+    public function commit(Request $request, string $batchId)
+    {
+        $batch = $this->readOwnedBatch($batchId, (string) $request->user_id);
+
+        if ($batch instanceof \Illuminate\Http\JsonResponse) {
+            return $batch;
+        }
+
+        if (($batch['status'] ?? null) !== 'PREVIEWED') {
+            return response()->json([
+                'message' => 'Import batch is not available for commit.',
+                'status' => $batch['status'] ?? null,
+            ], 409);
+        }
+
+        if (now()->greaterThan(\Carbon\Carbon::parse($batch['expires_at']))) {
+            File::deleteDirectory($this->getBatchDirectory($batchId));
+
+            return response()->json([
+                'message' => 'Import batch has expired.',
+            ], 410);
+        }
+
+        $batch['status'] = 'PROCESSING';
+        $this->writeBatch($batchId, $batch);
+
+        $summary = [
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'invalid' => 0,
+            'failed_during_commit' => 0,
+        ];
+
+        $finalRows = [];
+
+        foreach ($batch['rows'] as $row) {
+            if (($row['status'] ?? null) === 'INVALID') {
+                $summary['invalid']++;
+                $finalRows[] = $row;
+                continue;
+            }
+
+            if (($row['action'] ?? null) === 'SKIP') {
+                $summary['skipped']++;
+                $row['commit_status'] = 'SKIPPED';
+                $finalRows[] = $row;
+                continue;
+            }
+
+            $result = $this->processRow($row['source_data'], (int) $row['row']);
+
+            if (in_array($result['status'], ['created', 'updated', 'skipped'], true)) {
+                $summary[$result['status']]++;
+                $row['commit_status'] = strtoupper($result['status']);
+                $row['commit_message'] = $result['message'];
+            } else {
+                $summary['failed_during_commit']++;
+                $row['status'] = 'INVALID';
+                $row['action'] = null;
+                $row['errors'][] = 'Commit failed: ' . $result['message'];
+                $row['commit_status'] = 'FAILED';
+                $row['commit_message'] = $result['message'];
+            }
+
+            $finalRows[] = $row;
+        }
+
+        $batch['status'] = 'COMMITTED';
+        $batch['committed_at'] = now()->toIso8601String();
+        $batch['commit_summary'] = $summary;
+        $batch['rows'] = $finalRows;
+
+        $invalidRows = array_values(array_filter(
+            $finalRows,
+            fn (array $row) => ($row['status'] ?? null) === 'INVALID'
+        ));
+
+        if (count($invalidRows) > 0) {
+            $this->writeInvalidWorkbook($batchId, $invalidRows);
+            $this->writeBatch($batchId, $batch);
+
+            return response()->json([
+                'message' => 'User import committed',
+                'batch_id' => $batchId,
+                'summary' => $summary,
+                'invalid_file_url' => url("/api/users/import/{$batchId}/invalid-file"),
+            ]);
+        }
+
+        File::deleteDirectory($this->getBatchDirectory($batchId));
+
+        return response()->json([
+            'message' => 'User import committed',
+            'batch_id' => $batchId,
+            'summary' => $summary,
+            'invalid_file_url' => null,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────
+    // DELETE /api/users/import/{batchId}
+    // ─────────────────────────────────────────────
+    public function cancel(Request $request, string $batchId)
+    {
+        $batch = $this->readOwnedBatch($batchId, (string) $request->user_id);
+
+        if ($batch instanceof \Illuminate\Http\JsonResponse) {
+            return $batch;
+        }
+
+        File::deleteDirectory($this->getBatchDirectory($batchId));
+
+        return response()->json([
+            'message' => 'User import batch canceled.',
+            'batch_id' => $batchId,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────
+    // GET /api/users/import/{batchId}/invalid-file
+    // ─────────────────────────────────────────────
+    public function downloadInvalidFile(Request $request, string $batchId)
+    {
+        $batch = $this->readOwnedBatch($batchId, (string) $request->user_id);
+
+        if ($batch instanceof \Illuminate\Http\JsonResponse) {
+            return $batch;
+        }
+
+        if (($batch['status'] ?? null) !== 'COMMITTED') {
+            return response()->json([
+                'message' => 'Invalid file is only available after commit.',
+            ], 409);
+        }
+
+        $filePath = $this->getBatchDirectory($batchId) . DIRECTORY_SEPARATOR . 'invalid.xlsx';
+
+        if (!File::exists($filePath)) {
+            return response()->json([
+                'message' => 'No invalid rows file is available for this batch.',
+            ], 404);
+        }
+
+        $downloadName = 'users_import_invalid_' . now()->format('Ymd_His') . '.xlsx';
+        $batchDirectory = $this->getBatchDirectory($batchId);
+
+        app()->terminating(function () use ($batchDirectory) {
+            File::deleteDirectory($batchDirectory);
+        });
+
+        return response()->download($filePath, $downloadName);
+    }
+
+    private function buildPreviewRow(
+        array $rowData,
+        int $rowNumber,
+        array &$seenUsernames,
+        array &$seenInternalIds
+    ): array {
+        $username = trim((string) ($rowData['username'] ?? ''));
+        $user = $username !== ''
+            ? DB::connection('pilargroup')->table('central_users')->where('username', $username)->first()
+            : null;
+
+        $errors = $user
+            ? $this->validateUpdateRow($rowData, $user->id)
+            : $this->validateCreateRow($rowData);
+
+        $normalizedUsername = strtolower($username);
+        if ($normalizedUsername !== '') {
+            if (isset($seenUsernames[$normalizedUsername])) {
+                $errors[] = "Duplicate username in import file. First found at row {$seenUsernames[$normalizedUsername]}.";
+            } else {
+                $seenUsernames[$normalizedUsername] = $rowNumber;
+            }
+        }
+
+        $internalId = trim((string) ($rowData['internal_id'] ?? ''));
+        if ($internalId !== '') {
+            if (isset($seenInternalIds[$internalId])) {
+                $errors[] = "Duplicate internal ID in import file. First found at row {$seenInternalIds[$internalId]}.";
+            } else {
+                $seenInternalIds[$internalId] = $rowNumber;
+            }
+        }
+
+        $changes = [];
+        $action = $user ? 'UPDATE' : 'CREATE';
+
+        if ($user && count($errors) === 0) {
+            $changes = $this->buildUserChanges($user, $rowData);
+            if (count($changes) === 0) {
+                $action = 'SKIP';
+            }
+        }
+
+        if (!$user && count($errors) === 0) {
+            $changes = $this->buildCreateChanges($rowData);
+        }
+
+        return [
+            'row' => $rowNumber,
+            'username' => $username !== '' ? $username : null,
+            'status' => count($errors) > 0 ? 'INVALID' : 'VALID',
+            'action' => count($errors) > 0 ? null : $action,
+            'changes' => $changes,
+            'errors' => array_values(array_unique($errors)),
+            'source_data' => $rowData,
+        ];
+    }
+
+    private function buildCreateChanges(array $rowData): array
+    {
+        $changes = [];
+
+        foreach ($rowData as $field => $value) {
+            $changes[$field] = [
+                'old' => null,
+                'new' => $field === 'password' ? 'Password will be set' : $value,
+            ];
+        }
+
+        return $changes;
+    }
+
+    private function buildUserChanges($user, array $rowData): array
+    {
+        $changes = [];
+
+        if (!empty($rowData['password'])) {
+            $changes['password'] = [
+                'old' => '********',
+                'new' => 'Password will be changed',
+            ];
+        }
+
+        foreach ([
+            'name',
+            'email',
+            'phone',
+            'job_position',
+            'job_level_id',
+            'employment_type_code',
+            'internal_id',
+        ] as $field) {
+            if (!array_key_exists($field, $rowData) || $rowData[$field] === null || $rowData[$field] === '') {
+                continue;
+            }
+
+            $oldValue = $user->{$field} ?? null;
+            $newValue = $rowData[$field];
+
+            if ((string) $oldValue !== (string) $newValue) {
+                $changes[$field] = ['old' => $oldValue, 'new' => $newValue];
+            }
+        }
+
+        if (array_key_exists('is_active', $rowData) && $rowData['is_active'] !== null && $rowData['is_active'] !== '') {
+            $oldValue = (int) $user->is_active;
+            $newValue = $this->parseBoolean($rowData['is_active']);
+
+            if ($oldValue !== $newValue) {
+                $changes['is_active'] = ['old' => $oldValue, 'new' => $newValue];
+            }
+        }
+
+        if (!empty($rowData['department_ids'])) {
+            $oldDepartmentIds = $this->getUserDepartmentIds($user->id);
+            $newDepartmentIds = array_values(array_unique(array_map('intval', $this->parseList($rowData['department_ids']))));
+            sort($oldDepartmentIds);
+            sort($newDepartmentIds);
+
+            if ($oldDepartmentIds !== $newDepartmentIds) {
+                $changes['department_ids'] = ['old' => $oldDepartmentIds, 'new' => $newDepartmentIds];
+            }
+
+            $oldPrimary = (int) $this->getPrimaryDepartmentId($user->id);
+            $newPrimary = !empty($rowData['primary_department_id'])
+                ? (int) $rowData['primary_department_id']
+                : ($newDepartmentIds[0] ?? null);
+
+            if ($oldPrimary !== $newPrimary) {
+                $changes['primary_department_id'] = ['old' => $oldPrimary, 'new' => $newPrimary];
+            }
+        }
+
+        if (!empty($rowData['company_ids'])) {
+            $oldCompanyIds = array_map('strval', $this->getUserCompanyIds($user->id));
+            $newCompanyIds = array_values(array_unique(array_map('strval', $this->parseList($rowData['company_ids']))));
+            sort($oldCompanyIds);
+            sort($newCompanyIds);
+
+            if ($oldCompanyIds !== $newCompanyIds) {
+                $changes['company_ids'] = ['old' => $oldCompanyIds, 'new' => $newCompanyIds];
+            }
+
+            $oldPrimary = (string) $this->getPrimaryCompanyId($user->id);
+            $newPrimary = !empty($rowData['primary_company_id'])
+                ? (string) $rowData['primary_company_id']
+                : ($newCompanyIds[0] ?? null);
+
+            if ($oldPrimary !== (string) $newPrimary) {
+                $changes['primary_company_id'] = ['old' => $oldPrimary, 'new' => $newPrimary];
+            }
+        }
+
+        if (!empty($rowData['apps'])) {
+            $oldApps = $this->getUserAppSlugs($user->id);
+            $newApps = $this->parseList($rowData['apps']);
+            sort($oldApps);
+            sort($newApps);
+
+            if ($oldApps !== $newApps) {
+                $changes['apps'] = ['old' => $oldApps, 'new' => $newApps];
+            }
+        }
+
+        return $changes;
+    }
+
+    private function sanitizePreviewRow(array $row): array
+    {
+        unset($row['source_data']);
+        return $row;
+    }
+
+    private function getBatchDirectory(string $batchId): string
+    {
+        if (!preg_match('/^[a-f0-9-]{36}$/i', $batchId)) {
+            abort(404);
+        }
+
+        return storage_path('app/private/user-imports/' . $batchId);
+    }
+
+    private function getBatchFilePath(string $batchId): string
+    {
+        return $this->getBatchDirectory($batchId) . DIRECTORY_SEPARATOR . 'preview.enc';
+    }
+
+    private function writeBatch(string $batchId, array $batch): void
+    {
+        File::ensureDirectoryExists($this->getBatchDirectory($batchId));
+        $json = json_encode($batch, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        File::put($this->getBatchFilePath($batchId), Crypt::encryptString($json), true);
+    }
+
+    private function readBatch(string $batchId): ?array
+    {
+        $path = $this->getBatchFilePath($batchId);
+
+        if (!File::exists($path)) {
+            return null;
+        }
+
+        return json_decode(Crypt::decryptString(File::get($path)), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function readOwnedBatch(string $batchId, string $userId)
+    {
+        try {
+            $batch = $this->readBatch($batchId);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Import batch could not be read.',
+            ], 500);
+        }
+
+        if (!$batch) {
+            return response()->json([
+                'message' => 'Import batch not found.',
+            ], 404);
+        }
+
+        if (!hash_equals((string) ($batch['created_by'] ?? ''), $userId)) {
+            return response()->json([
+                'message' => 'You are not allowed to access this import batch.',
+            ], 403);
+        }
+
+        return $batch;
+    }
+
+    private function writeInvalidWorkbook(string $batchId, array $rows): void
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Invalid Users');
+
+        $headers = array_merge(self::SUPPORTED_HEADERS, [
+            'import_row',
+            'import_status',
+            'import_errors',
+        ]);
+
+        foreach ($headers as $index => $header) {
+            $column = Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->setCellValue("{$column}1", $header);
+        }
+
+        $outputRow = 2;
+        foreach ($rows as $row) {
+            if (($row['status'] ?? null) !== 'INVALID') {
+                continue;
+            }
+
+            $sourceData = $row['source_data'] ?? [];
+            $values = [];
+
+            foreach (self::SUPPORTED_HEADERS as $header) {
+                $values[] = $sourceData[$header] ?? null;
+            }
+
+            $values[] = $row['row'] ?? null;
+            $values[] = 'INVALID';
+            $values[] = implode(' | ', $row['errors'] ?? []);
+
+            foreach ($values as $index => $value) {
+                $column = Coordinate::stringFromColumnIndex($index + 1);
+                $sheet->setCellValue("{$column}{$outputRow}", $value);
+            }
+
+            $outputRow++;
+        }
+
+        $this->autoSizeColumns($sheet, count($headers));
+        $this->addJobLevelsReferenceSheet($spreadsheet);
+        $this->addDepartmentsReferenceSheet($spreadsheet);
+        $this->addCompaniesReferenceSheet($spreadsheet);
+        $this->addAppsReferenceSheet($spreadsheet);
+        $this->addEmploymentTypeReferenceSheet($spreadsheet);
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($this->getBatchDirectory($batchId) . DIRECTORY_SEPARATOR . 'invalid.xlsx');
     }
 
     // ─────────────────────────────────────────────
@@ -401,18 +892,10 @@ class UserImportController extends Controller
                     ->increment('token_version');
 
                 (new SnipeItService())->forceRelogin($updatedUser->username);
-                (new TicketService())->forceLogout($user->id);
             }
 
             if ($snipeRelevant) {
                 $this->syncSnipeIt($updatedUser, $user->username);
-            }
-
-            $finalApps = $this->getUserAppSlugs($user->id);
-
-            if (in_array('ticket', $finalApps, true)) {
-                $deptName = $this->getPrimaryDepartmentName($user->id);
-                (new TicketService())->syncUser($updatedUser, $deptName, $user->username);
             }
 
             return [
@@ -888,11 +1371,6 @@ class UserImportController extends Controller
             ->first();
 
         $this->syncSnipeIt($user);
-
-        if (in_array('ticket', $apps, true)) {
-            $deptName = $this->getPrimaryDepartmentName($userId);
-            (new TicketService())->syncUser($user, $deptName);
-        }
     }
 
     private function syncSnipeIt($user, ?string $oldUsername = null): void

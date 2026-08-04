@@ -33,7 +33,10 @@ Route::prefix('users')
         // User import - IT only
         Route::middleware('it.only')->group(function () {
             Route::get('/import-template', [UserImportController::class, 'downloadTemplate']);
-            Route::post('/import', [UserImportController::class, 'import']);
+            Route::post('/import/preview', [UserImportController::class, 'preview']);
+            Route::post('/import/{batchId}/commit', [UserImportController::class, 'commit']);
+            Route::get('/import/{batchId}/invalid-file', [UserImportController::class, 'downloadInvalidFile']);
+            Route::delete('/import/{batchId}', [UserImportController::class, 'cancel']);
         });
 
         // User management - IT full access, HCGA limited access
