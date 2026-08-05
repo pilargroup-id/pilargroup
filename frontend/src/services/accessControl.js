@@ -9,6 +9,7 @@ import { getStoredUser } from '@/services/api'
 const HCGA_DEPARTMENT_ID = 1
 const IT_DEPARTMENT_ID = 8
 const ADMIN_HUMAN_CAPITAL_POSITION = 'Admin Human Capital'
+const USER_IMPORT_JOB_LEVEL_VALUE = 1
 const IT_DEPARTMENT_ALIASES = [
   'it',
   'information technology',
@@ -91,6 +92,22 @@ function hasAdminHumanCapitalPosition(user) {
   return getJobPosition(user) === ADMIN_HUMAN_CAPITAL_POSITION
 }
 
+function getJobLevelValue(user) {
+  const value = user?.job_level_value ?? user?.jobLevelValue
+  const numericValue = Number(value)
+
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+// Mirrors backend UserImportAccess middleware: IT (department code SIT) or an
+// exact job_level_value = 1 + job_position = "Admin Human Capital" combo.
+function hasUserImportJobLevelPosition(user) {
+  return (
+    getJobLevelValue(user) === USER_IMPORT_JOB_LEVEL_VALUE &&
+    normalizeSlug(getJobPosition(user)) === normalizeSlug(ADMIN_HUMAN_CAPITAL_POSITION)
+  )
+}
+
 export function normalizeAccessUser(user = getStoredUser()) {
   const sourceUser = user && typeof user === 'object' ? user : {}
   const departments = normalizeDepartmentList(sourceUser)
@@ -117,6 +134,7 @@ export function normalizeAccessUser(user = getStoredUser()) {
       hasDepartmentId(departments, HCGA_DEPARTMENT_ID) ||
       hasDepartmentAlias(department, departments, HCGA_DEPARTMENT_ALIASES) ||
       hasAdminHumanCapitalPosition(sourceUser),
+    isUserImportHumanCapitalAdmin: hasUserImportJobLevelPosition(sourceUser),
   }
 }
 
@@ -126,6 +144,12 @@ export function isITUser(user = getStoredUser()) {
 
 export function isHCGAUser(user = getStoredUser()) {
   return normalizeAccessUser(user).isHCGA
+}
+
+export function canAccessUserImport(user = getStoredUser()) {
+  const accessUser = normalizeAccessUser(user)
+
+  return accessUser.isIT || accessUser.isUserImportHumanCapitalAdmin
 }
 
 export function canAccessUserManagement(user = getStoredUser()) {

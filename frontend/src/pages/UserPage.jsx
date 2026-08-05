@@ -14,7 +14,7 @@ import {
   downloadUsersExport,
 } from '@/services/manageUsers'
 import { getStoredUser } from '@/services/api'
-import { canManageUserTarget, isITUser } from '@/services/accessControl'
+import { canAccessUserImport, canManageUserTarget, isITUser } from '@/services/accessControl'
 import RegisterUserPopup from '@/components/Users/RegisterUserPopup'
 import EditUserPopup from '@/components/Users/EditUserPopup'
 import DeleteUserPopup from '@/components/Users/DeleteUserPopup'
@@ -111,6 +111,7 @@ function UserPage() {
   const accessUser = getStoredUser()
   const canManageApps = isITUser(accessUser)
   const canDeleteUsers = canManageApps
+  const canAccessImportExport = canAccessUserImport(accessUser)
 
   const canEditManagedUser = (user) => canManageUserTarget(user, accessUser)
 
@@ -424,7 +425,7 @@ function UserPage() {
             onDownloadTemplate={handleDownloadTemplate}
             onUploadUsers={handleUploadUsers}
             isUploading={isUploading}
-            showImportExport={canManageApps}
+            showImportExport={canAccessImportExport}
           />
         </article>
       </section>

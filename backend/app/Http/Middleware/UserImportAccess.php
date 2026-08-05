@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class UserImportAccess
 {
-    private const HC_ADMIN_JOB_LEVEL_ID = 1;
+    private const HC_ADMIN_JOB_LEVEL_VALUE = 1;
     private const HC_ADMIN_JOB_POSITION = 'Admin Human Capital';
 
     public function handle(Request $request, Closure $next)
@@ -27,13 +27,14 @@ class UserImportAccess
             ->exists();
 
         $user = DB::connection('pilargroup')
-            ->table('central_users')
-            ->where('id', $userId)
-            ->select('job_level_id', 'job_position')
+            ->table('central_users as cu')
+            ->leftJoin('master_job_levels as mjl', 'cu.job_level_id', '=', 'mjl.id')
+            ->where('cu.id', $userId)
+            ->select('cu.job_position', 'mjl.level as job_level_value')
             ->first();
 
         $isHumanCapitalAdmin = $user
-            && (int) $user->job_level_id === self::HC_ADMIN_JOB_LEVEL_ID
+            && (int) $user->job_level_value === self::HC_ADMIN_JOB_LEVEL_VALUE
             && strcasecmp(trim((string) $user->job_position), self::HC_ADMIN_JOB_POSITION) === 0;
 
         if (!$isIT && !$isHumanCapitalAdmin) {

@@ -1010,8 +1010,10 @@ class UserImportController extends Controller
             $errors = array_merge($errors, $this->validateCompanyIds($companyIds, $rowData['primary_company_id'] ?? null));
         }
 
-        $apps = $this->buildCreateAppSlugs($rowData);
-        $errors = array_merge($errors, $this->validateAppSlugs($apps));
+        if (!empty($rowData['apps'])) {
+            $manualApps = $this->parseList($rowData['apps']);
+            $errors = array_merge($errors, $this->validateAppSlugs($manualApps));
+        }
 
         if (!empty($rowData['is_active']) && is_null($this->parseBooleanNullable($rowData['is_active']))) {
             $errors[] = 'is_active must be 1, 0, true, false, active, or inactive.';
@@ -1296,10 +1298,27 @@ class UserImportController extends Controller
             ? $this->parseList($rowData['apps'])
             : [];
 
+        // Default apps are best-effort: skip any that don't exist yet in
+        // master_projects instead of blocking user creation entirely.
+        $existingDefaultApps = $this->filterExistingAppSlugs(self::DEFAULT_CREATE_APPS);
+
         return array_values(array_unique(array_merge(
-            self::DEFAULT_CREATE_APPS,
+            $existingDefaultApps,
             $manualApps
         )));
+    }
+
+    private function filterExistingAppSlugs(array $appSlugs): array
+    {
+        if (count($appSlugs) === 0) {
+            return [];
+        }
+
+        return DB::connection('pilargroup')
+            ->table('master_projects')
+            ->whereIn('slug', $appSlugs)
+            ->pluck('slug')
+            ->all();
     }
 
     private function parseBoolean($value): int
