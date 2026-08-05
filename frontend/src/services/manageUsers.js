@@ -417,16 +417,64 @@ export async function downloadUserImportTemplate() {
   setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
 }
 
-export async function importUsers(file) {
+export async function previewUserImport(file) {
   const formData = new FormData()
   formData.append('file', file)
 
-  const payload = await api.request(`${USERS_PATH}/import`, {
+  return api.request(`${USERS_PATH}/import/preview`, {
     method: 'POST',
     body: formData,
   })
+}
 
-  return payload
+export async function commitUserImport(batchId) {
+  return api.request(`${USERS_PATH}/import/${batchId}/commit`, {
+    method: 'POST',
+  })
+}
+
+export async function cancelUserImport(batchId) {
+  return api.request(`${USERS_PATH}/import/${batchId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function downloadInvalidUserImport(batchId) {
+  const url = `${API_BASE_URL}${USERS_PATH}/import/${batchId}/invalid-file`
+  const token = getToken()
+  const headers = new Headers()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(url, { method: 'GET', headers })
+  if (!response.ok) {
+    let errorMessage = 'Failed to download invalid rows file'
+    try {
+      const errorData = await response.json()
+      if (errorData?.message) errorMessage = errorData.message
+    } catch {
+      // Ignored
+    }
+    throw new Error(errorMessage)
+  }
+
+  const blob = await response.blob()
+  let fileName = 'users_import_invalid.xlsx'
+  const disposition = response.headers.get('content-disposition')
+  const match = disposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i)
+  if (match?.[1]) {
+    fileName = match[1].replace(/['"]/g, '')
+  }
+
+  const objectUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.setAttribute('download', fileName)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
 }
 
 export async function downloadUsersExport() {
@@ -499,7 +547,10 @@ const manageUsersService = {
   normalizeUserApps: normalizeManagedUserApps,
   resolveUserApps: resolveManagedUserApps,
   downloadImportTemplate: downloadUserImportTemplate,
-  importUsers,
+  previewUserImport,
+  commitUserImport,
+  cancelUserImport,
+  downloadInvalidUserImport,
   downloadUsersExport,
 }
 

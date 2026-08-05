@@ -143,7 +143,7 @@ async function parseResponseBody(response) {
   if (!text) {
     return null
   }
-
+// 
   try {
     return JSON.parse(text)
   } catch {

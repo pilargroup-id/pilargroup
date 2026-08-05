@@ -11,7 +11,6 @@ import {
   updateManagedUser,
   updateManagedUserStatus,
   downloadUserImportTemplate,
-  importUsers,
   downloadUsersExport,
 } from '@/services/manageUsers'
 import { getStoredUser } from '@/services/api'
@@ -19,6 +18,7 @@ import { canManageUserTarget, isITUser } from '@/services/accessControl'
 import RegisterUserPopup from '@/components/Users/RegisterUserPopup'
 import EditUserPopup from '@/components/Users/EditUserPopup'
 import DeleteUserPopup from '@/components/Users/DeleteUserPopup'
+import PreviewUploadPopup from '@/components/Users/PreviewUploadPopup'
 
 const USERS_PER_PAGE = 25
 
@@ -105,6 +105,8 @@ function UserPage() {
   const [isDeletingUser, setIsDeletingUser] = useState(false)
   const [updatingStatusUserIds, setUpdatingStatusUserIds] = useState([])
   const [isUploading, setIsUploading] = useState(false)
+  const [importPreviewFile, setImportPreviewFile] = useState(null)
+  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false)
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
   const accessUser = getStoredUser()
   const canManageApps = isITUser(accessUser)
@@ -156,19 +158,20 @@ function UserPage() {
     }
   }
 
-  const handleUploadUsers = async (file) => {
-    try {
-      setIsUploading(true)
-      const result = await importUsers(file)
-      window.alert(result?.message || 'Users imported successfully.')
-      await loadUsers()
-    } catch (error) {
-      const msg = error?.message || 'Failed to import users.'
-      setUsersError(msg)
-      window.alert(msg)
-    } finally {
-      setIsUploading(false)
-    }
+  const handleUploadUsers = (file) => {
+    setImportPreviewFile(file)
+    setIsImportPreviewOpen(true)
+    setIsUploading(true)
+  }
+
+  const handleCloseImportPreview = () => {
+    setIsImportPreviewOpen(false)
+    setImportPreviewFile(null)
+    setIsUploading(false)
+  }
+
+  const handleImportCommitted = async () => {
+    await loadUsers()
   }
 
   const handleRegisterUser = async () => {
@@ -448,6 +451,13 @@ function UserPage() {
         errorMessage={deletingUser ? deleteUserError : ''}
         onClose={handleCloseDeleteUser}
         onConfirm={handleConfirmDeleteUser}
+      />
+
+      <PreviewUploadPopup
+        isOpen={isImportPreviewOpen}
+        file={importPreviewFile}
+        onClose={handleCloseImportPreview}
+        onCommitted={handleImportCommitted}
       />
     </AppLayout>
   )
