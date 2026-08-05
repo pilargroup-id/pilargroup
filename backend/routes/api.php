@@ -30,8 +30,8 @@ Route::prefix('auth')
 Route::prefix('users')
     ->middleware('auth.central')
     ->group(function () {
-        // User import - IT only
-        Route::middleware('it.only')->group(function () {
+        // User import - IT or Admin Human Capital
+        Route::middleware('user.import.access')->group(function () {
             Route::get('/import-template', [UserImportController::class, 'downloadTemplate']);
             Route::post('/import/preview', [UserImportController::class, 'preview']);
             Route::post('/import/{batchId}/commit', [UserImportController::class, 'commit']);

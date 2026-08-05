@@ -36,7 +36,26 @@ class UserImportController extends Controller
         'is_active',
     ];
 
+    private const TEMPLATE_HEADERS = [
+        'username',
+        'password',
+        'name',
+        'email',
+        'phone',
+        'job_position',
+        'job_level_id',
+        'employment_type_code',
+        'internal_id',
+        'department_ids',
+        'primary_department_id',
+        'company_ids',
+        'primary_company_id',
+        'is_active',
+    ];
+
     private const EMPLOYMENT_TYPE_CODES = ['UP', 'OS', 'HL'];
+
+    private const DEFAULT_CREATE_APPS = ['ticket', 'overtime'];
 
     // ─────────────────────────────────────────────
     // GET /api/users/import-template
@@ -48,7 +67,7 @@ class UserImportController extends Controller
         $usersSheet = $spreadsheet->getActiveSheet();
         $usersSheet->setTitle(self::USER_SHEET_NAME);
 
-        $headers = self::SUPPORTED_HEADERS;
+        $headers = self::TEMPLATE_HEADERS;
 
         foreach ($headers as $index => $header) {
             $column = Coordinate::stringFromColumnIndex($index + 1);
@@ -69,7 +88,6 @@ class UserImportController extends Controller
             '8',
             'comp-pnm-0001',
             'comp-pnm-0001',
-            'ticket,lawdesk',
             '1',
         ];
 
@@ -165,7 +183,8 @@ class UserImportController extends Controller
                     $rowData,
                     $rowNumber,
                     $seenUsernames,
-                    $seenInternalIds
+                    $seenInternalIds,
+                    (bool) $request->input('auth_import_can_manage_apps', false)
                 );
 
                 if ($previewRow['status'] === 'INVALID') {
@@ -181,6 +200,7 @@ class UserImportController extends Controller
             $batch = [
                 'batch_id' => $batchId,
                 'created_by' => (string) $request->user_id,
+                'created_by_can_manage_apps' => (bool) $request->input('auth_import_can_manage_apps', false),
                 'status' => 'PREVIEWED',
                 'original_filename' => $request->file('file')->getClientOriginalName(),
                 'source_file' => $sourceFileName,
@@ -252,7 +272,23 @@ class UserImportController extends Controller
 
         $finalRows = [];
 
+        $canManageApps = (bool) $request->input('auth_import_can_manage_apps', false);
+
         foreach ($batch['rows'] as $row) {
+            $rowHasApps = !empty($row['source_data']['apps'] ?? null);
+
+            if ($rowHasApps && !$canManageApps) {
+                $row['status'] = 'INVALID';
+                $row['action'] = null;
+                $row['errors'][] = 'Application access can only be managed by IT users.';
+                $row['errors'] = array_values(array_unique($row['errors']));
+                $row['commit_status'] = 'FAILED';
+                $row['commit_message'] = 'Application access permission was rejected during commit validation.';
+                $summary['invalid']++;
+                $finalRows[] = $row;
+                continue;
+            }
+
             if (($row['status'] ?? null) === 'INVALID') {
                 $summary['invalid']++;
                 $finalRows[] = $row;
@@ -374,7 +410,8 @@ class UserImportController extends Controller
         array $rowData,
         int $rowNumber,
         array &$seenUsernames,
-        array &$seenInternalIds
+        array &$seenInternalIds,
+        bool $canManageApps
     ): array {
         $username = trim((string) ($rowData['username'] ?? ''));
         $user = $username !== ''
@@ -384,6 +421,10 @@ class UserImportController extends Controller
         $errors = $user
             ? $this->validateUpdateRow($rowData, $user->id)
             : $this->validateCreateRow($rowData);
+
+        if (!empty($rowData['apps']) && !$canManageApps) {
+            $errors[] = 'Application access can only be managed by IT users.';
+        }
 
         $normalizedUsername = strtolower($username);
         if ($normalizedUsername !== '') {
@@ -433,11 +474,20 @@ class UserImportController extends Controller
         $changes = [];
 
         foreach ($rowData as $field => $value) {
+            if ($field === 'apps') {
+                continue;
+            }
+
             $changes[$field] = [
                 'old' => null,
                 'new' => $field === 'password' ? 'Password will be set' : $value,
             ];
         }
+
+        $changes['apps'] = [
+            'old' => null,
+            'new' => $this->buildCreateAppSlugs($rowData),
+        ];
 
         return $changes;
     }
@@ -704,7 +754,7 @@ class UserImportController extends Controller
             );
         }
 
-        $apps = !empty($rowData['apps']) ? $this->parseList($rowData['apps']) : [];
+        $apps = $this->buildCreateAppSlugs($rowData);
 
         $isActive = array_key_exists('is_active', $rowData)
             ? $this->parseBoolean($rowData['is_active'])
@@ -960,10 +1010,8 @@ class UserImportController extends Controller
             $errors = array_merge($errors, $this->validateCompanyIds($companyIds, $rowData['primary_company_id'] ?? null));
         }
 
-        if (!empty($rowData['apps'])) {
-            $apps = $this->parseList($rowData['apps']);
-            $errors = array_merge($errors, $this->validateAppSlugs($apps));
-        }
+        $apps = $this->buildCreateAppSlugs($rowData);
+        $errors = array_merge($errors, $this->validateAppSlugs($apps));
 
         if (!empty($rowData['is_active']) && is_null($this->parseBooleanNullable($rowData['is_active']))) {
             $errors[] = 'is_active must be 1, 0, true, false, active, or inactive.';
@@ -1239,6 +1287,19 @@ class UserImportController extends Controller
             ->unique()
             ->values()
             ->toArray();
+    }
+
+
+    private function buildCreateAppSlugs(array $rowData): array
+    {
+        $manualApps = !empty($rowData['apps'])
+            ? $this->parseList($rowData['apps'])
+            : [];
+
+        return array_values(array_unique(array_merge(
+            self::DEFAULT_CREATE_APPS,
+            $manualApps
+        )));
     }
 
     private function parseBoolean($value): int
