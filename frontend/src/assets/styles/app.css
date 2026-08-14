@@ -20,9 +20,9 @@
   --sidebar-current-width: var(--sidebar-width);
   display: grid;
   grid-template-columns: var(--sidebar-current-width) minmax(0, 1fr);
-  height: 100dvh;
-  min-height: 100vh;
-  max-height: 100dvh;
+  height: calc(100dvh / var(--app-zoom));
+  min-height: calc(100vh / var(--app-zoom));
+  max-height: calc(100dvh / var(--app-zoom));
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -69,8 +69,8 @@
 .sidebar {
   background: linear-gradient(180deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
   width: var(--sidebar-current-width);
-  height: 100dvh;
-  min-height: 100vh;
+  height: calc(100dvh / var(--app-zoom));
+  min-height: calc(100vh / var(--app-zoom));
   position: sticky;
   top: 0;
   left: 0;
@@ -1695,6 +1695,15 @@
 
 .users-table-card__action svg {
   flex-shrink: 0;
+}
+
+.users-table-block {
+  --table-zoom: 0.7;
+  zoom: var(--table-zoom);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .users-table-filter {
@@ -3651,8 +3660,8 @@
     left: 0;
     width: min(86vw, var(--sidebar-width));
     max-width: calc(100vw - 16px);
-    height: 100dvh;
-    min-height: 100dvh;
+    height: calc(100dvh / var(--app-zoom));
+    min-height: calc(100dvh / var(--app-zoom));
     transform: translateX(-100%);
     overflow-y: auto;
     overscroll-behavior: contain;
