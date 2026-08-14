@@ -1698,7 +1698,7 @@
 }
 
 .users-table-block {
-  --table-zoom: 0.7;
+  --table-zoom: 0.95;
   zoom: var(--table-zoom);
   display: flex;
   flex-direction: column;
