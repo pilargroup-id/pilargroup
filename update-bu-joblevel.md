@@ -12,7 +12,7 @@ User Management sekarang bisa diakses oleh 2 department:
 
 | Department |  ID | Access         |
 | ---------- | --: | -------------- |
-| IT         | `8` | Full access    |
+| IT         | `8` | Full access    | 
 | HCGA       | `1` | Limited access |
 
 ## 1.2 Access Rule
@@ -557,7 +557,7 @@ GET /api/master/business-units?search=gosave
 ```
 
 ```http
-GET /api/master/business-units?company_id=comp-pnm-0001
+GET /api/master/business-units?company_id=comp-pnm-0001 
 ```
 
 ```http

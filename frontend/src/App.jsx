@@ -4,6 +4,7 @@ import { defaultNavigationPath } from '@/constants/navigation'
 import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
 import MasterBusinessUnitPage from '@/pages/MasterBusinessUnit'
+import MasterCompaniesPage from '@/pages/MasterCompanies'
 import MasterDepartementsPage from '@/pages/MasterDepartements'
 import MasterProjectPage from '@/pages/MasterProject'
 import UserPage from '@/pages/UserPage'
@@ -16,6 +17,7 @@ const routes = {
   '/dashboard': DashboardPage,
   '/login': LoginPage,
   '/master-departments': MasterDepartementsPage,
+  '/master-companies': MasterCompaniesPage,
   '/master-project': MasterProjectPage,
   '/business-unit': MasterBusinessUnitPage,
   '/users': UserPage,

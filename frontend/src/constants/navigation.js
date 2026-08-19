@@ -1,5 +1,8 @@
 import {
   BarChartSquare02,
+  Briefcase01,
+  Building01,
+  Building06,
   Database01,
   Folder,
   LogOut01,
@@ -12,10 +15,11 @@ import {
 export const defaultNavigationPath = '/dashboard'
 export const implementedNavigationPaths = [
   '/dashboard',
+  '/business-unit',
   '/master-departments',
+  '/master-companies',
   '/users',
   '/master-project',
-  '/business-unit',
 ]
 
 export const primaryNavigationItems = [
@@ -41,18 +45,25 @@ export const primaryNavigationItems = [
         icon: Folder,
       },
       {
-        id: 'master-departments',
-        label: 'Departments',
-        href: '/master-departments',
-        icon: Users01,
-      },
-      {
         id: 'business-unit',
         label: 'Business Unit',
         href: '/business-unit',
-        icon: Folder,
+        icon: Briefcase01,
+      },
+      {
+        id: 'master-companies',
+        label: 'Companies',
+        href: '/master-companies',
+        icon: Building01,
+      },
+      {
+        id: 'master-departments',
+        label: 'Departments',
+        href: '/master-departments',
+        icon: Building06,
       },
     ],
+
   },
 ]
 

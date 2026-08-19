@@ -5,6 +5,8 @@ import api from '@/services/api'
 import { getDepartments } from '@/services/master/getDepartements'
 import BusinessUnitDepartmentsField from './BusinessUnitDepartmentsField'
 
+const CODE_MAX_LENGTH = 30
+
 function getCreateFormState() {
   return {
     name: '',
@@ -12,6 +14,13 @@ function getCreateFormState() {
     companyId: '',
     isActive: 'active',
   }
+}
+
+function generateCodeFromName(name, maxLength = CODE_MAX_LENGTH) {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '')
+    .slice(0, maxLength)
 }
 
 function CreateBUPopup({
@@ -28,12 +37,14 @@ function CreateBUPopup({
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(false)
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([])
   const [primaryDepartmentId, setPrimaryDepartmentId] = useState('')
+  const [isCodeCustomized, setIsCodeCustomized] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setFormValues(getCreateFormState())
       setSelectedDepartmentIds([])
       setPrimaryDepartmentId('')
+      setIsCodeCustomized(false)
 
       const fetchCompanies = async () => {
         setIsLoadingCompanies(true)
@@ -94,9 +105,16 @@ function CreateBUPopup({
   const handleChange = (event) => {
     const { name, value } = event.target
 
+    if (name === 'code') {
+      setIsCodeCustomized(true)
+    }
+
     setFormValues((currentValues) => ({
       ...currentValues,
       [name]: value,
+      ...(name === 'name' && !isCodeCustomized
+        ? { code: generateCodeFromName(value) }
+        : null),
     }))
 
     if (name === 'companyId') {
@@ -197,15 +215,16 @@ function CreateBUPopup({
               </label>
 
               <label className="register-user-popup__field">
-                <span className="register-user-popup__label">Kode Business Unit</span>
+                <span className="register-user-popup__label">Kode Business Unit (otomatis)</span>
                 <input
                   className="register-user-popup__input"
                   type="text"
                   name="code"
                   value={formValues.code}
                   onChange={handleChange}
-                  placeholder="Masukkan kode business unit"
+                  placeholder="Terisi otomatis dari nama"
                   autoComplete="off"
+                  maxLength={CODE_MAX_LENGTH}
                   required
                 />
               </label>

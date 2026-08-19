@@ -1,62 +1,30 @@
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react'
 import { XClose } from '@untitledui/icons'
-import api from '@/services/api'
+import { createPortal } from 'react-dom'
 
-const CODE_MAX_LENGTH = 10
-
-function getCreateFormState() {
+function getEditFormState(company) {
   return {
-    name: '',
-    code: '',
-    companyId: '',
+    name: company?.name ?? '',
+    code: company?.code ?? '',
+    isActive: company?.isActive === false ? 'inactive' : 'active',
   }
 }
 
-function generateCodeFromName(name, maxLength = CODE_MAX_LENGTH) {
-  return name
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '')
-    .slice(0, maxLength)
-}
-
-function CreateDepartmentPopup({
-  isOpen,
+function EditCompaniesPopup({
+  company,
   isSubmitting,
   errorMessage,
   onClose,
   onSubmit,
 }) {
-  const [formValues, setFormValues] = useState(() => getCreateFormState())
-  const [companies, setCompanies] = useState([])
-  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
-  const [isCodeCustomized, setIsCodeCustomized] = useState(false)
+  const [formValues, setFormValues] = useState(() => getEditFormState(company))
 
   useEffect(() => {
-    if (isOpen) {
-      setFormValues(getCreateFormState())
-      setIsCodeCustomized(false)
-
-      const fetchCompanies = async () => {
-        setIsLoadingCompanies(true)
-        try {
-          const res = await api.request('/master/companies')
-          const data = Array.isArray(res) ? res : (res?.data || [])
-          console.log('Fetched companies:', data)
-          setCompanies(data)
-        } catch (error) {
-          console.error('Failed to load companies:', error)
-        } finally {
-          setIsLoadingCompanies(false)
-        }
-      }
-
-      void fetchCompanies()
-    }
-  }, [isOpen])
+    setFormValues(getEditFormState(company))
+  }, [company])
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!company) {
       return undefined
     }
 
@@ -71,25 +39,18 @@ function CreateDepartmentPopup({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, isSubmitting, onClose])
+  }, [company, isSubmitting, onClose])
 
-  if (!isOpen) {
+  if (!company) {
     return null
   }
 
   const handleChange = (event) => {
     const { name, value } = event.target
 
-    if (name === 'code') {
-      setIsCodeCustomized(true)
-    }
-
     setFormValues((currentValues) => ({
       ...currentValues,
       [name]: value,
-      ...(name === 'name' && !isCodeCustomized
-        ? { code: generateCodeFromName(value) }
-        : null),
     }))
   }
 
@@ -110,21 +71,21 @@ function CreateDepartmentPopup({
         className="dashboard-popup register-user-popup"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="department-create-popup-title"
+        aria-labelledby="company-edit-popup-title"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="dashboard-popup__header">
           <div>
-            <p className="dashboard-popup__eyebrow">Master Department</p>
-            <h2 className="dashboard-popup__title" id="department-create-popup-title">
-              Create Department
+            <p className="dashboard-popup__eyebrow">Master Company</p>
+            <h2 className="dashboard-popup__title" id="company-edit-popup-title">
+              Edit {company.name}
             </h2>
           </div>
 
           <button
             type="button"
             className="dashboard-popup__close"
-            aria-label="Tutup popup create department"
+            aria-label="Tutup popup edit company"
             onClick={handleClose}
             disabled={isSubmitting}
           >
@@ -135,7 +96,7 @@ function CreateDepartmentPopup({
         <form className="register-user-popup__form" onSubmit={handleSubmit}>
           <div className="dashboard-popup__body">
             <p className="dashboard-popup__text">
-              Tambahkan department baru ke master department directory.
+              Perbarui data company. ID company tetap <strong>{company.id}</strong>.
             </p>
 
             {errorMessage ? (
@@ -146,52 +107,44 @@ function CreateDepartmentPopup({
 
             <div className="register-user-popup__grid">
               <label className="register-user-popup__field">
-                <span className="register-user-popup__label">Nama Department</span>
+                <span className="register-user-popup__label">Company Name</span>
                 <input
                   className="register-user-popup__input"
                   type="text"
                   name="name"
                   value={formValues.name}
                   onChange={handleChange}
-                  placeholder="Masukkan nama department"
+                  placeholder="Masukkan nama company"
                   autoComplete="off"
                   required
                 />
               </label>
 
               <label className="register-user-popup__field">
-                <span className="register-user-popup__label">Kode Department (otomatis)</span>
+                <span className="register-user-popup__label">Kode Company</span>
                 <input
                   className="register-user-popup__input"
                   type="text"
                   name="code"
                   value={formValues.code}
                   onChange={handleChange}
-                  placeholder="Terisi otomatis dari nama"
+                  placeholder="Masukkan kode (maks 10 karakter)"
                   autoComplete="off"
-                  maxLength={CODE_MAX_LENGTH}
+                  maxLength={10}
                   required
                 />
               </label>
 
               <label className="register-user-popup__field register-user-popup__field--full">
-                <span className="register-user-popup__label">Company</span>
+                <span className="register-user-popup__label">Status</span>
                 <select
                   className="register-user-popup__input"
-                  name="companyId"
-                  value={formValues.companyId}
+                  name="isActive"
+                  value={formValues.isActive}
                   onChange={handleChange}
-                  required
-                  disabled={isLoadingCompanies}
                 >
-                  <option value="" disabled>
-                    {isLoadingCompanies ? 'Loading companies...' : 'Pilih perusahaan'}
-                  </option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
                 </select>
               </label>
             </div>
@@ -211,7 +164,7 @@ function CreateDepartmentPopup({
               className="dashboard-popup__button dashboard-popup__button--primary"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Membuat...' : 'Create Department'}
+              {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
           </div>
         </form>
@@ -220,4 +173,4 @@ function CreateDepartmentPopup({
   , document.body)
 }
 
-export default CreateDepartmentPopup
+export default EditCompaniesPopup
