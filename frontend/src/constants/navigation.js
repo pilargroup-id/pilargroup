@@ -15,6 +15,7 @@ export const implementedNavigationPaths = [
   '/master-departments',
   '/users',
   '/master-project',
+  '/business-unit',
 ]
 
 export const primaryNavigationItems = [
@@ -44,6 +45,12 @@ export const primaryNavigationItems = [
         label: 'Departments',
         href: '/master-departments',
         icon: Users01,
+      },
+      {
+        id: 'business-unit',
+        label: 'Business Unit',
+        href: '/business-unit',
+        icon: Folder,
       },
     ],
   },

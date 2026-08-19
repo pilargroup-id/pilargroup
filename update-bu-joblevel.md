@@ -1025,7 +1025,7 @@ Laravel validation response example:
 * Tambahkan menu/page Master Business Unit.
 * Consume endpoint:
 
-  * `GET /api/master/business-units`
+* `GET /api/master/business-units`
   * `POST /api/master/business-units`
   * `GET /api/master/business-units/{id}`
   * `PUT /api/master/business-units/{id}`

@@ -340,10 +340,55 @@ export const usersApi = {
   updateUser,
 }
 
+export async function getBusinessUnits(params) {
+  return apiRequest('/master/business-units', { params })
+}
+
+export async function getBusinessUnitById(id) {
+  return apiRequest(`/master/business-units/${id}`)
+}
+
+export async function createBusinessUnit(payload) {
+  return apiRequest('/master/business-units', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function updateBusinessUnit(id, payload) {
+  return apiRequest(`/master/business-units/${id}`, {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
+export async function toggleBusinessUnitStatus(id, isActive) {
+  return apiRequest(`/master/business-units/${id}/status`, {
+    method: 'PATCH',
+    body: { is_active: isActive },
+  })
+}
+
+export async function deleteBusinessUnit(id) {
+  return apiRequest(`/master/business-units/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export const businessUnitsApi = {
+  getBusinessUnits,
+  getBusinessUnitById,
+  createBusinessUnit,
+  updateBusinessUnit,
+  toggleBusinessUnitStatus,
+  deleteBusinessUnit,
+}
+
 const api = {
   request: apiRequest,
   auth: authApi,
   users: usersApi,
+  businessUnits: businessUnitsApi,
 }
 
 export default api
