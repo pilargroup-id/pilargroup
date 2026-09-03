@@ -35,6 +35,7 @@ Route::prefix('users')
             Route::get('/import-template', [UserImportController::class, 'downloadTemplate']);
             Route::post('/import/preview', [UserImportController::class, 'preview']);
             Route::post('/import/{batchId}/commit', [UserImportController::class, 'commit']);
+            Route::get('/import/{batchId}/status', [UserImportController::class, 'status']);
             Route::get('/import/{batchId}/invalid-file', [UserImportController::class, 'downloadInvalidFile']);
             Route::delete('/import/{batchId}', [UserImportController::class, 'cancel']);
         });

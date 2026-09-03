@@ -4,9 +4,17 @@ import { XClose } from '@untitledui/icons'
 import {
   previewUserImport,
   commitUserImport,
+  getUserImportStatus,
   cancelUserImport,
   downloadInvalidUserImport,
 } from '@/services/manageUsers'
+
+const IMPORT_STATUS_POLL_INTERVAL_MS = 3000
+const IMPORT_STATUS_MAX_POLL_ATTEMPTS = 200 // ~10 minutes at the interval above
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 const FILTERS = ['ALL', 'CREATE', 'UPDATE', 'SKIP', 'INVALID']
 
@@ -199,7 +207,21 @@ function PreviewUploadPopup({ isOpen, file, onClose, onCommitted }) {
     setActionError('')
 
     try {
-      const response = await commitUserImport(batchId)
+      let response = await commitUserImport(batchId)
+      let attempts = 0
+
+      while (response?.status === 'PROCESSING' && attempts < IMPORT_STATUS_MAX_POLL_ATTEMPTS) {
+        await sleep(IMPORT_STATUS_POLL_INTERVAL_MS)
+        response = await getUserImportStatus(batchId)
+        attempts += 1
+      }
+
+      if (response?.status === 'PROCESSING') {
+        throw new Error(
+          'Import masih diproses di server. Buka lagi popup ini beberapa saat lagi untuk cek hasilnya.',
+        )
+      }
+
       setCommitResult(response)
 
       if (response?.invalid_file_url) {
@@ -480,7 +502,7 @@ function PreviewUploadPopup({ isOpen, file, onClose, onCommitted }) {
                   onClick={handleCommit}
                   disabled={isBusy || isPreviewing || !batchId || rows.length === 0}
                 >
-                  {isCommitting ? 'Menyimpan...' : 'Commit'}
+                  {isCommitting ? 'Memproses...' : 'Commit'}
                 </button>
               )}
             </>

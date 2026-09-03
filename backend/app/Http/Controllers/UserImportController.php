@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SnipeItService;
+use App\Jobs\ProcessUserImportCommitJob;
+use App\Jobs\SyncSnipeItUserJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -262,93 +263,149 @@ class UserImportController extends Controller
         $batch['status'] = 'PROCESSING';
         $this->writeBatch($batchId, $batch);
 
-        $summary = [
-            'created' => 0,
-            'updated' => 0,
-            'skipped' => 0,
-            'invalid' => 0,
-            'failed_during_commit' => 0,
-        ];
-
-        $finalRows = [];
-
         $canManageApps = (bool) $request->input('auth_import_can_manage_apps', false);
 
-        foreach ($batch['rows'] as $row) {
-            $rowHasApps = !empty($row['source_data']['apps'] ?? null);
+        ProcessUserImportCommitJob::dispatch($batchId, $canManageApps);
 
-            if ($rowHasApps && !$canManageApps) {
-                $row['status'] = 'INVALID';
-                $row['action'] = null;
-                $row['errors'][] = 'Application access can only be managed by IT users.';
-                $row['errors'] = array_values(array_unique($row['errors']));
-                $row['commit_status'] = 'FAILED';
-                $row['commit_message'] = 'Application access permission was rejected during commit validation.';
-                $summary['invalid']++;
-                $finalRows[] = $row;
-                continue;
-            }
+        return response()->json([
+            'message' => 'User import is being processed.',
+            'batch_id' => $batchId,
+            'status' => 'PROCESSING',
+        ]);
+    }
 
-            if (($row['status'] ?? null) === 'INVALID') {
-                $summary['invalid']++;
-                $finalRows[] = $row;
-                continue;
-            }
+    // ─────────────────────────────────────────────
+    // Runs on the queue worker, dispatched by commit().
+    // Large imports take longer than any HTTP gateway allows,
+    // so the row loop must not run inside the request lifecycle.
+    // ─────────────────────────────────────────────
+    public function processCommitBatch(string $batchId, bool $canManageApps): void
+    {
+        $batch = $this->readBatch($batchId);
 
-            if (($row['action'] ?? null) === 'SKIP') {
-                $summary['skipped']++;
-                $row['commit_status'] = 'SKIPPED';
-                $finalRows[] = $row;
-                continue;
-            }
-
-            $result = $this->processRow($row['source_data'], (int) $row['row']);
-
-            if (in_array($result['status'], ['created', 'updated', 'skipped'], true)) {
-                $summary[$result['status']]++;
-                $row['commit_status'] = strtoupper($result['status']);
-                $row['commit_message'] = $result['message'];
-            } else {
-                $summary['failed_during_commit']++;
-                $row['status'] = 'INVALID';
-                $row['action'] = null;
-                $row['errors'][] = 'Commit failed: ' . $result['message'];
-                $row['commit_status'] = 'FAILED';
-                $row['commit_message'] = $result['message'];
-            }
-
-            $finalRows[] = $row;
+        if (!$batch) {
+            return;
         }
 
-        $batch['status'] = 'COMMITTED';
-        $batch['committed_at'] = now()->toIso8601String();
-        $batch['commit_summary'] = $summary;
-        $batch['rows'] = $finalRows;
+        try {
+            $summary = [
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'invalid' => 0,
+                'failed_during_commit' => 0,
+            ];
 
-        $invalidRows = array_values(array_filter(
-            $finalRows,
-            fn (array $row) => ($row['status'] ?? null) === 'INVALID'
-        ));
+            $finalRows = [];
 
-        if (count($invalidRows) > 0) {
-            $this->writeInvalidWorkbook($batchId, $invalidRows);
+            foreach ($batch['rows'] as $row) {
+                $rowHasApps = !empty($row['source_data']['apps'] ?? null);
+
+                if ($rowHasApps && !$canManageApps) {
+                    $row['status'] = 'INVALID';
+                    $row['action'] = null;
+                    $row['errors'][] = 'Application access can only be managed by IT users.';
+                    $row['errors'] = array_values(array_unique($row['errors']));
+                    $row['commit_status'] = 'FAILED';
+                    $row['commit_message'] = 'Application access permission was rejected during commit validation.';
+                    $summary['invalid']++;
+                    $finalRows[] = $row;
+                    continue;
+                }
+
+                if (($row['status'] ?? null) === 'INVALID') {
+                    $summary['invalid']++;
+                    $finalRows[] = $row;
+                    continue;
+                }
+
+                if (($row['action'] ?? null) === 'SKIP') {
+                    $summary['skipped']++;
+                    $row['commit_status'] = 'SKIPPED';
+                    $finalRows[] = $row;
+                    continue;
+                }
+
+                $result = $this->processRow($row['source_data'], (int) $row['row']);
+
+                if (in_array($result['status'], ['created', 'updated', 'skipped'], true)) {
+                    $summary[$result['status']]++;
+                    $row['commit_status'] = strtoupper($result['status']);
+                    $row['commit_message'] = $result['message'];
+                } else {
+                    $summary['failed_during_commit']++;
+                    $row['status'] = 'INVALID';
+                    $row['action'] = null;
+                    $row['errors'][] = 'Commit failed: ' . $result['message'];
+                    $row['commit_status'] = 'FAILED';
+                    $row['commit_message'] = $result['message'];
+                }
+
+                $finalRows[] = $row;
+            }
+
+            $invalidRows = array_values(array_filter(
+                $finalRows,
+                fn (array $row) => ($row['status'] ?? null) === 'INVALID'
+            ));
+
+            if (count($invalidRows) > 0) {
+                $this->writeInvalidWorkbook($batchId, $invalidRows);
+            }
+
+            $batch['status'] = 'COMMITTED';
+            $batch['committed_at'] = now()->toIso8601String();
+            $batch['commit_summary'] = $summary;
+            $batch['rows'] = $finalRows;
+            $batch['invalid_file_available'] = count($invalidRows) > 0;
+
+            $this->writeBatch($batchId, $batch);
+        } catch (\Throwable $e) {
+            $batch['status'] = 'FAILED';
+            $batch['error'] = $e->getMessage();
             $this->writeBatch($batchId, $batch);
 
+            \Illuminate\Support\Facades\Log::error('User import commit job failed: ' . $e->getMessage());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // GET /api/users/import/{batchId}/status
+    // ─────────────────────────────────────────────
+    public function status(Request $request, string $batchId)
+    {
+        $batch = $this->readOwnedBatch($batchId, (string) $request->user_id);
+
+        if ($batch instanceof \Illuminate\Http\JsonResponse) {
+            return $batch;
+        }
+
+        $status = $batch['status'] ?? null;
+
+        if ($status === 'COMMITTED') {
             return response()->json([
                 'message' => 'User import committed',
                 'batch_id' => $batchId,
-                'summary' => $summary,
-                'invalid_file_url' => url("/api/users/import/{$batchId}/invalid-file"),
+                'status' => $status,
+                'summary' => $batch['commit_summary'] ?? null,
+                'invalid_file_url' => !empty($batch['invalid_file_available'])
+                    ? url("/api/users/import/{$batchId}/invalid-file")
+                    : null,
             ]);
         }
 
-        File::deleteDirectory($this->getBatchDirectory($batchId));
+        if ($status === 'FAILED') {
+            return response()->json([
+                'message' => 'User import failed to process: ' . ($batch['error'] ?? 'unknown error'),
+                'batch_id' => $batchId,
+                'status' => $status,
+                'error' => $batch['error'] ?? null,
+            ], 500);
+        }
 
         return response()->json([
-            'message' => 'User import committed',
             'batch_id' => $batchId,
-            'summary' => $summary,
-            'invalid_file_url' => null,
+            'status' => $status,
         ]);
     }
 
@@ -801,7 +858,7 @@ class UserImportController extends Controller
                 }
             });
 
-            $this->syncExternalAfterCreate($userId, $apps);
+            SyncSnipeItUserJob::dispatch('sync', $userId);
 
             return [
                 'row' => $rowNumber,
@@ -941,11 +998,11 @@ class UserImportController extends Controller
                     ->where('id', $user->id)
                     ->increment('token_version');
 
-                (new SnipeItService())->forceRelogin($updatedUser->username);
+                SyncSnipeItUserJob::dispatch('relogin', username: $updatedUser->username);
             }
 
             if ($snipeRelevant) {
-                $this->syncSnipeIt($updatedUser, $user->username);
+                SyncSnipeItUserJob::dispatch('sync', $user->id, $user->username);
             }
 
             return [
@@ -1438,44 +1495,6 @@ class UserImportController extends Controller
         }
 
         return $errors;
-    }
-
-    // ─────────────────────────────────────────────
-    // EXTERNAL SYNC
-    // ─────────────────────────────────────────────
-    private function syncExternalAfterCreate(string $userId, array $apps): void
-    {
-        $user = DB::connection('pilargroup')
-            ->table('central_users')
-            ->where('id', $userId)
-            ->first();
-
-        $this->syncSnipeIt($user);
-    }
-
-    private function syncSnipeIt($user, ?string $oldUsername = null): void
-    {
-        $deptName = $this->getPrimaryDepartmentName($user->id);
-
-        $jobLevelName = null;
-        if ($user->job_level_id) {
-            $jobLevelName = DB::connection('pilargroup')
-                ->table('master_job_levels')
-                ->where('id', $user->job_level_id)
-                ->value('name');
-        }
-
-        (new SnipeItService())->syncUser($user, $deptName, $jobLevelName, $oldUsername);
-    }
-
-    private function getPrimaryDepartmentName(string $userId): ?string
-    {
-        return DB::connection('pilargroup')
-            ->table('central_user_departments as cud')
-            ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
-            ->where('cud.user_id', $userId)
-            ->orderByRaw('cud.is_primary DESC')
-            ->value('md.name');
     }
 
     private function getUserAppSlugs(string $userId): array
