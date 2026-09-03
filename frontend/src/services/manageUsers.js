@@ -433,6 +433,10 @@ export async function commitUserImport(batchId) {
   })
 }
 
+export async function getUserImportStatus(batchId) {
+  return api.request(`${USERS_PATH}/import/${batchId}/status`)
+}
+
 export async function cancelUserImport(batchId) {
   return api.request(`${USERS_PATH}/import/${batchId}`, {
     method: 'DELETE',
