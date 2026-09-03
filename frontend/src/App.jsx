@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage'
 import MasterBusinessUnitPage from '@/pages/MasterBusinessUnit'
 import MasterCompaniesPage from '@/pages/MasterCompanies'
 import MasterDepartementsPage from '@/pages/MasterDepartements'
+import MasterJobLevelPage from '@/pages/MasterJobLevel'
 import MasterProjectPage from '@/pages/MasterProject'
 import UserPage from '@/pages/UserPage'
 import { isAuthenticated, getToken, getStoredUser } from '@/services/api'
@@ -17,6 +18,7 @@ const routes = {
   '/dashboard': DashboardPage,
   '/login': LoginPage,
   '/master-departments': MasterDepartementsPage,
+  '/master-job-level': MasterJobLevelPage,
   '/master-companies': MasterCompaniesPage,
   '/master-project': MasterProjectPage,
   '/business-unit': MasterBusinessUnitPage,

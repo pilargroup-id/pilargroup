@@ -1,4 +1,5 @@
 import {
+  Award01,
   BarChartSquare02,
   Briefcase01,
   Building01,
@@ -20,6 +21,7 @@ export const implementedNavigationPaths = [
   '/master-companies',
   '/users',
   '/master-project',
+  '/master-job-level',
 ]
 
 export const primaryNavigationItems = [
@@ -62,8 +64,13 @@ export const primaryNavigationItems = [
         href: '/master-departments',
         icon: Building06,
       },
+      {
+        id: 'master-job-level',
+        label: 'Job Level',
+        href: '/master-job-level',
+        icon: Award01,
+      },
     ],
-
   },
 ]
 

@@ -8,6 +8,7 @@ import {
   DownloadCloud02,
   UploadCloud02,
 } from '@untitledui/icons'
+import ChangeStatusPopup from './ChangeStatusPopup'
 
 const ROWS_PER_PAGE_OPTIONS = [25, 100, 250]
 const DEFAULT_USERS_PER_PAGE = ROWS_PER_PAGE_OPTIONS[0]
@@ -406,6 +407,7 @@ function TableUser({
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(() => getSafeUsersPerPage(usersPerPage))
+  const [pendingStatusChange, setPendingStatusChange] = useState(null)
   const visibleUserIdsKey = users.map((user) => user.userId).join('|')
   const hasActiveFilters = Object.values(filters).some(Boolean)
 
@@ -509,7 +511,21 @@ function TableUser({
 
   const handleChangeUserStatus = (event, user) => {
     event.stopPropagation()
-    onStatusChange?.(user, event.target.checked)
+    setPendingStatusChange({ user, nextActive: event.target.checked })
+  }
+
+  const handleCancelStatusChange = () => {
+    setPendingStatusChange(null)
+  }
+
+  const handleConfirmStatusChange = async () => {
+    if (!pendingStatusChange) {
+      return
+    }
+
+    const { user, nextActive } = pendingStatusChange
+    await onStatusChange?.(user, nextActive)
+    setPendingStatusChange(null)
   }
 
   const handleFilterChange = (filterKey, value) => {
@@ -605,7 +621,7 @@ function TableUser({
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <UploadCloud02 size={16} />
-                {isUploading ? 'Uploading...' : 'Upload'}
+                {isUploading ? 'Uploading...' : 'Import'}
               </button>
               <input
                 type="file"
@@ -883,6 +899,18 @@ function TableUser({
           </div>
         </div>
       ) : null}
+
+      <ChangeStatusPopup
+        user={pendingStatusChange?.user ?? null}
+        nextActive={pendingStatusChange?.nextActive ?? false}
+        isSubmitting={
+          pendingStatusChange
+            ? updatingStatusUserIds.includes(pendingStatusChange.user.userId)
+            : false
+        }
+        onClose={handleCancelStatusChange}
+        onConfirm={handleConfirmStatusChange}
+      />
     </div>
   )
 }
