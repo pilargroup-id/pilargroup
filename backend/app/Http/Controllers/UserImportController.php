@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SnipeItService;
+use App\Jobs\SyncSnipeItUserJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -56,14 +56,6 @@ class UserImportController extends Controller
     private const EMPLOYMENT_TYPE_CODES = ['UP', 'OS', 'HL'];
 
     private const DEFAULT_CREATE_APPS = ['ticket', 'overtime'];
-
-    /**
-     * Snipe-IT sync is network-bound and too slow to run inline for large
-     * imports (causes gateway timeouts). Rows queue their sync here and it
-     * runs after the HTTP response is already sent, see processRow() callers
-     * and commit()'s app()->terminating() registration.
-     */
-    private array $pendingSnipeItSyncs = [];
 
     // ─────────────────────────────────────────────
     // GET /api/users/import-template
@@ -332,14 +324,6 @@ class UserImportController extends Controller
         $batch['committed_at'] = now()->toIso8601String();
         $batch['commit_summary'] = $summary;
         $batch['rows'] = $finalRows;
-
-        if (count($this->pendingSnipeItSyncs) > 0) {
-            $pendingSyncs = $this->pendingSnipeItSyncs;
-
-            app()->terminating(function () use ($pendingSyncs) {
-                $this->processDeferredSnipeItSyncs($pendingSyncs);
-            });
-        }
 
         $invalidRows = array_values(array_filter(
             $finalRows,
@@ -817,7 +801,7 @@ class UserImportController extends Controller
                 }
             });
 
-            $this->pendingSnipeItSyncs[] = ['type' => 'sync', 'user_id' => $userId, 'old_username' => null];
+            SyncSnipeItUserJob::dispatch('sync', $userId);
 
             return [
                 'row' => $rowNumber,
@@ -957,11 +941,11 @@ class UserImportController extends Controller
                     ->where('id', $user->id)
                     ->increment('token_version');
 
-                $this->pendingSnipeItSyncs[] = ['type' => 'relogin', 'username' => $updatedUser->username];
+                SyncSnipeItUserJob::dispatch('relogin', username: $updatedUser->username);
             }
 
             if ($snipeRelevant) {
-                $this->pendingSnipeItSyncs[] = ['type' => 'sync', 'user_id' => $user->id, 'old_username' => $user->username];
+                SyncSnipeItUserJob::dispatch('sync', $user->id, $user->username);
             }
 
             return [
@@ -1454,60 +1438,6 @@ class UserImportController extends Controller
         }
 
         return $errors;
-    }
-
-    // ─────────────────────────────────────────────
-    // EXTERNAL SYNC
-    // ─────────────────────────────────────────────
-    private function processDeferredSnipeItSyncs(array $pendingSyncs): void
-    {
-        foreach ($pendingSyncs as $sync) {
-            try {
-                switch ($sync['type'] ?? null) {
-                    case 'sync':
-                        $user = DB::connection('pilargroup')
-                            ->table('central_users')
-                            ->where('id', $sync['user_id'])
-                            ->first();
-
-                        if ($user) {
-                            $this->syncSnipeIt($user, $sync['old_username'] ?? null);
-                        }
-                        break;
-
-                    case 'relogin':
-                        (new SnipeItService())->forceRelogin($sync['username']);
-                        break;
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('SnipeIt deferred sync failed: ' . $e->getMessage());
-            }
-        }
-    }
-
-    private function syncSnipeIt($user, ?string $oldUsername = null): void
-    {
-        $deptName = $this->getPrimaryDepartmentName($user->id);
-
-        $jobLevelName = null;
-        if ($user->job_level_id) {
-            $jobLevelName = DB::connection('pilargroup')
-                ->table('master_job_levels')
-                ->where('id', $user->job_level_id)
-                ->value('name');
-        }
-
-        (new SnipeItService())->syncUser($user, $deptName, $jobLevelName, $oldUsername);
-    }
-
-    private function getPrimaryDepartmentName(string $userId): ?string
-    {
-        return DB::connection('pilargroup')
-            ->table('central_user_departments as cud')
-            ->join('master_departments as md', 'cud.department_id', '=', 'md.id')
-            ->where('cud.user_id', $userId)
-            ->orderByRaw('cud.is_primary DESC')
-            ->value('md.name');
     }
 
     private function getUserAppSlugs(string $userId): array
