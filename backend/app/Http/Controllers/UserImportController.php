@@ -57,6 +57,14 @@ class UserImportController extends Controller
 
     private const DEFAULT_CREATE_APPS = ['ticket', 'overtime'];
 
+    /**
+     * Snipe-IT sync is network-bound and too slow to run inline for large
+     * imports (causes gateway timeouts). Rows queue their sync here and it
+     * runs after the HTTP response is already sent, see processRow() callers
+     * and commit()'s app()->terminating() registration.
+     */
+    private array $pendingSnipeItSyncs = [];
+
     // ─────────────────────────────────────────────
     // GET /api/users/import-template
     // ─────────────────────────────────────────────
@@ -324,6 +332,14 @@ class UserImportController extends Controller
         $batch['committed_at'] = now()->toIso8601String();
         $batch['commit_summary'] = $summary;
         $batch['rows'] = $finalRows;
+
+        if (count($this->pendingSnipeItSyncs) > 0) {
+            $pendingSyncs = $this->pendingSnipeItSyncs;
+
+            app()->terminating(function () use ($pendingSyncs) {
+                $this->processDeferredSnipeItSyncs($pendingSyncs);
+            });
+        }
 
         $invalidRows = array_values(array_filter(
             $finalRows,
@@ -801,7 +817,7 @@ class UserImportController extends Controller
                 }
             });
 
-            $this->syncExternalAfterCreate($userId, $apps);
+            $this->pendingSnipeItSyncs[] = ['type' => 'sync', 'user_id' => $userId, 'old_username' => null];
 
             return [
                 'row' => $rowNumber,
@@ -941,11 +957,11 @@ class UserImportController extends Controller
                     ->where('id', $user->id)
                     ->increment('token_version');
 
-                (new SnipeItService())->forceRelogin($updatedUser->username);
+                $this->pendingSnipeItSyncs[] = ['type' => 'relogin', 'username' => $updatedUser->username];
             }
 
             if ($snipeRelevant) {
-                $this->syncSnipeIt($updatedUser, $user->username);
+                $this->pendingSnipeItSyncs[] = ['type' => 'sync', 'user_id' => $user->id, 'old_username' => $user->username];
             }
 
             return [
@@ -1443,14 +1459,30 @@ class UserImportController extends Controller
     // ─────────────────────────────────────────────
     // EXTERNAL SYNC
     // ─────────────────────────────────────────────
-    private function syncExternalAfterCreate(string $userId, array $apps): void
+    private function processDeferredSnipeItSyncs(array $pendingSyncs): void
     {
-        $user = DB::connection('pilargroup')
-            ->table('central_users')
-            ->where('id', $userId)
-            ->first();
+        foreach ($pendingSyncs as $sync) {
+            try {
+                switch ($sync['type'] ?? null) {
+                    case 'sync':
+                        $user = DB::connection('pilargroup')
+                            ->table('central_users')
+                            ->where('id', $sync['user_id'])
+                            ->first();
 
-        $this->syncSnipeIt($user);
+                        if ($user) {
+                            $this->syncSnipeIt($user, $sync['old_username'] ?? null);
+                        }
+                        break;
+
+                    case 'relogin':
+                        (new SnipeItService())->forceRelogin($sync['username']);
+                        break;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('SnipeIt deferred sync failed: ' . $e->getMessage());
+            }
+        }
     }
 
     private function syncSnipeIt($user, ?string $oldUsername = null): void
