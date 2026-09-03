@@ -564,7 +564,7 @@ function TableUser({
   )
 
   return (
-    <>
+    <div className="users-table-block">
       <div className="users-table-filter" aria-label="User table filters">
         <div className="users-table-filter__grid">
           {renderFilterSelect('company', 'Company', filterOptions.company)}
@@ -883,7 +883,7 @@ function TableUser({
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   )
 }
 

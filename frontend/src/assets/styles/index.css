@@ -12,6 +12,7 @@
   --radius-lg: 28px;
   --radius-md: 20px;
   --radius-sm: 14px;
+  --app-zoom: 0.75;
 }
 
 * {
@@ -21,12 +22,13 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
+  zoom: var(--app-zoom);
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--app-zoom));
   overflow-x: hidden;
   background: var(--page-background);
   color: var(--text);
@@ -45,5 +47,5 @@ select {
 }
 
 #root {
-  min-height: 100vh;
+  min-height: calc(100vh / var(--app-zoom));
 }
