@@ -297,7 +297,7 @@ class MasterController extends Controller
     {
         $request->validate([
             'name'  => 'required|string|max:100',
-            'level' => 'required|integer|min:1',
+            'level' => 'required|numeric|min:0.5|multiple_of:0.5',
         ]);
 
         $exists = DB::connection('pilargroup')
@@ -329,7 +329,7 @@ class MasterController extends Controller
     {
         $request->validate([
             'name'  => 'nullable|string|max:100',
-            'level' => 'nullable|integer|min:1',
+            'level' => 'nullable|numeric|min:0.5|multiple_of:0.5',
         ]);
 
         $jobLevel = DB::connection('pilargroup')

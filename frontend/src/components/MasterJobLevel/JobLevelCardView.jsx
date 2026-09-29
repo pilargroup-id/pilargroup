@@ -128,8 +128,8 @@ function JobLevelCardView({ activePath = '/master-job-level' }) {
       return
     }
 
-    if (formValues.level === '' || Number(formValues.level) < 1) {
-      setActionError('Level wajib diisi dan minimal 1.')
+    if (formValues.level === '' || Number(formValues.level) < 0.5) {
+      setActionError('Level wajib diisi dan minimal 0,5.')
       return
     }
 
@@ -181,8 +181,8 @@ function JobLevelCardView({ activePath = '/master-job-level' }) {
       return
     }
 
-    if (formValues.level === '' || Number(formValues.level) < 1) {
-      setActionError('Level wajib diisi dan minimal 1.')
+    if (formValues.level === '' || Number(formValues.level) < 0.5) {
+      setActionError('Level wajib diisi dan minimal 0,5.')
       return
     }
 

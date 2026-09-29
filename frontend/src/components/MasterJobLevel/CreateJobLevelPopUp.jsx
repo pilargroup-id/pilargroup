@@ -130,9 +130,10 @@ function CreateJobLevelPopup({
                   name="level"
                   value={formValues.level}
                   onChange={handleChange}
-                  placeholder="Masukkan angka level"
+                  placeholder="Masukkan level (kelipatan 0,5)"
                   autoComplete="off"
-                  min={1}
+                  min={0.5}
+                  step={0.5}
                   required
                 />
               </label>
