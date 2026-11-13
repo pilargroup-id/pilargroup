@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { clearAuthSession, getToken, setStoredUser } from '@/services/api'
 
 const POLL_INTERVAL = 5_000
 const STATUS_URL = '/api/auth/status'
+const LOGIN_PATH = '/login'
 
 function getStoredCv() {
   try {
@@ -17,33 +18,43 @@ function getStoredCv() {
 
 function handleExpired() {
   clearAuthSession()
-  window.location.href = '/login'
+
+  // Sudah di halaman login → jangan reload, supaya input user tidak hilang
+  if (window.location.pathname === LOGIN_PATH) return
+
+  window.location.href = LOGIN_PATH
 }
 
 export function useSessionGuard() {
-  const intervalRef = useRef(null)
-
   useEffect(() => {
-    const token = getToken()
-    if (!token) return
-
-    // Kalau cv belum ada di localStorage, refresh dari /api/auth/me dulu
-    if (getStoredCv() === null) {
-      fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(user => {
-          if (user) setStoredUser(user)
-        })
-        .catch(() => {})
-    }
+    let cvRefreshedFor = null
 
     const check = async () => {
+      // Selalu baca token terbaru (bisa berubah karena login/logout tanpa reload)
+      const token = getToken()
+      if (!token) return
+
+      // Kalau cv belum ada di localStorage, refresh dari /api/auth/me dulu (sekali per token)
+      if (getStoredCv() === null && cvRefreshedFor !== token) {
+        cvRefreshedFor = token
+        try {
+          const r = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          const user = r.ok ? await r.json() : null
+          if (user && getToken() === token) setStoredUser(user)
+        } catch {
+          // skip
+        }
+      }
+
       try {
         const res = await fetch(STATUS_URL, {
           headers: { Authorization: `Bearer ${token}` },
         })
+
+        // Token sudah berganti/dihapus selama request berjalan → abaikan hasil lama
+        if (getToken() !== token) return
 
         if (res.status === 401) {
           handleExpired()
@@ -53,6 +64,7 @@ export function useSessionGuard() {
         if (!res.ok) return
 
         const data = await res.json()
+        if (getToken() !== token) return
 
         if (!data.valid) {
           handleExpired()
@@ -65,14 +77,13 @@ export function useSessionGuard() {
             handleExpired()
           }
         }
-
       } catch {
         // network error sementara, skip
       }
     }
 
     check()
-    intervalRef.current = setInterval(check, POLL_INTERVAL)
+    const intervalId = setInterval(check, POLL_INTERVAL)
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -82,7 +93,7 @@ export function useSessionGuard() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      clearInterval(intervalRef.current)
+      clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])

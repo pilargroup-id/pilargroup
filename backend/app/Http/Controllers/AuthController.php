@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\CentralUser;
 
@@ -163,18 +165,52 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $request->validate([
-            'username' => 'required',
-            'password' => 'required',
+        $credentials = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string'],
+        ], [
+            'username.required' => 'Username wajib diisi.',
+            'username.max'      => 'Username maksimal 255 karakter.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
-        $user = CentralUser::where('username', $request->username)
-            ->where('is_active', 1)
-            ->first();
+        $username = trim($credentials['username']);
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        // Batasi percobaan gagal per username + IP untuk mencegah brute force
+        $throttleKey = Str::lower($username) . '|' . $request->ip();
+        $maxAttempts = 5;
+        $decaySeconds = 60;
+
+        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            return response()->json([
+                'message' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik.",
+                'retry_after' => $seconds,
+            ], 429);
         }
+
+        $user = CentralUser::where('username', $username)->first();
+
+        if (!$user) {
+            RateLimiter::hit($throttleKey, $decaySeconds);
+
+            return $this->loginFieldError('username', 'Username tidak terdaftar.');
+        }
+
+        if (!Hash::check($credentials['password'], $user->password)) {
+            RateLimiter::hit($throttleKey, $decaySeconds);
+
+            return $this->loginFieldError('password', 'Password yang Anda masukkan salah.');
+        }
+
+        // Status aktif dicek setelah password benar, supaya status akun
+        // hanya terlihat oleh orang yang memang tahu password-nya
+        if ((int) $user->is_active !== 1) {
+            return $this->loginFieldError('username', 'Akun ini sudah tidak aktif. Hubungi tim IT.');
+        }
+
+        RateLimiter::clear($throttleKey);
 
         if ($request->filled('sso_token')) {
             try {
@@ -215,6 +251,14 @@ class AuthController extends Controller
             'token' => $token,
             'user'  => $authUser,
         ]);
+    }
+
+    protected function loginFieldError(string $field, string $message)
+    {
+        return response()->json([
+            'message' => $message,
+            'errors'  => [$field => [$message]],
+        ], 422);
     }
 
     // GET /api/auth/status

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowCircleRight,
   CircleCut,
@@ -13,12 +13,44 @@ import '@/assets/styles/login.css'
 import { defaultNavigationPath } from '@/constants/navigation'
 import { submitLogin } from '@/services/loginService'
 
+const NO_FIELD_ERRORS = { username: '', password: '' }
+
+function resolveLoginError(error) {
+  const apiErrors = error?.data?.errors
+
+  if (error?.status === 422 && apiErrors) {
+    const fieldErrors = {
+      username: apiErrors.username?.[0] ?? '',
+      password: apiErrors.password?.[0] ?? '',
+    }
+
+    if (fieldErrors.username || fieldErrors.password) {
+      return { fieldErrors, formError: '' }
+    }
+  }
+
+  let formError = error?.message || 'Login gagal. Silakan coba lagi.'
+
+  if (error instanceof TypeError) {
+    // fetch() melempar TypeError saat server tidak bisa dihubungi
+    formError = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.'
+  } else if (error?.status >= 500) {
+    formError = 'Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.'
+  }
+
+  return { fieldErrors: NO_FIELD_ERRORS, formError }
+}
+
 function LoginPage() {
   const [username, setUsername]         = useState('')
   const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
+  const [fieldErrors, setFieldErrors]   = useState(NO_FIELD_ERRORS)
+  const [formError, setFormError]       = useState('')
+
+  const usernameRef = useRef(null)
+  const passwordRef = useRef(null)
 
   const params   = new URLSearchParams(window.location.search)
   const ssoToken = params.get('sso_token')
@@ -33,7 +65,8 @@ const handleSubmit = async (event) => {
   event.preventDefault()
   if (isSubmitting) return
 
-  setErrorMessage('')
+  setFieldErrors(NO_FIELD_ERRORS)
+  setFormError('')
   setIsSubmitting(true)
 
   try {
@@ -142,9 +175,19 @@ const handleSubmit = async (event) => {
     window.dispatchEvent(new PopStateEvent('popstate'))
 
   } catch (error) {
-    setErrorMessage(
-      error?.message || 'Login gagal. Periksa kembali username dan password Anda.',
-    )
+    const { fieldErrors: nextFieldErrors, formError: nextFormError } = resolveLoginError(error)
+
+    setFieldErrors(nextFieldErrors)
+    setFormError(nextFormError)
+
+    if (nextFieldErrors.username) {
+      usernameRef.current?.focus()
+      usernameRef.current?.select()
+    } else if (nextFieldErrors.password) {
+      // Password salah → kosongkan supaya user langsung ketik ulang
+      if (password) setPassword('')
+      passwordRef.current?.focus()
+    }
   } finally {
     setIsSubmitting(false)
   }
@@ -183,41 +226,63 @@ const handleSubmit = async (event) => {
               </p>
             </div>
 
-            <form className="login-page__form" onSubmit={handleSubmit}>
-              <label className="login-page__field">
-                <span className="login-page__label">Username *</span>
-                <span className="login-page__input-shell">
+            <form className="login-page__form" onSubmit={handleSubmit} noValidate>
+              <div className="login-page__field">
+                <label className="login-page__label" htmlFor="login-username">Username *</label>
+                <span
+                  className={`login-page__input-shell${fieldErrors.username ? ' login-page__input-shell--invalid' : ''}`}
+                >
                   <UserCircle className="login-page__input-icon" size={20} />
                   <input
+                    id="login-username"
+                    ref={usernameRef}
                     className="login-page__input"
                     type="text"
                     value={username}
                     onChange={(event) => {
                       setUsername(event.target.value)
-                      setErrorMessage('')
+                      setFieldErrors((current) => ({ ...current, username: '' }))
+                      setFormError('')
                     }}
                     placeholder="Enter your username"
                     autoComplete="username"
-                    disabled={isSubmitting}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    maxLength={255}
+                    readOnly={isSubmitting}
+                    aria-invalid={Boolean(fieldErrors.username)}
+                    aria-describedby={fieldErrors.username ? 'login-username-error' : undefined}
                   />
                 </span>
-              </label>
+                {fieldErrors.username ? (
+                  <p id="login-username-error" className="login-page__field-error" role="alert">
+                    {fieldErrors.username}
+                  </p>
+                ) : null}
+              </div>
 
-              <label className="login-page__field">
-                <span className="login-page__label">Password *</span>
-                <span className="login-page__input-shell">
+              <div className="login-page__field">
+                <label className="login-page__label" htmlFor="login-password">Password *</label>
+                <span
+                  className={`login-page__input-shell${fieldErrors.password ? ' login-page__input-shell--invalid' : ''}`}
+                >
                   <LockKeyholeCircle className="login-page__input-icon" size={20} />
                   <input
+                    id="login-password"
+                    ref={passwordRef}
                     className="login-page__input"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(event) => {
                       setPassword(event.target.value)
-                      setErrorMessage('')
+                      setFieldErrors((current) => ({ ...current, password: '' }))
+                      setFormError('')
                     }}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    disabled={isSubmitting}
+                    readOnly={isSubmitting}
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
                   />
                   <button
                     type="button"
@@ -229,9 +294,14 @@ const handleSubmit = async (event) => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </span>
-              </label>
+                {fieldErrors.password ? (
+                  <p id="login-password-error" className="login-page__field-error" role="alert">
+                    {fieldErrors.password}
+                  </p>
+                ) : null}
+              </div>
 
-              {errorMessage ? <p className="login-page__alert">{errorMessage}</p> : null}
+              {formError ? <p className="login-page__alert" role="alert">{formError}</p> : null}
 
               <button className="login-page__submit" type="submit" disabled={isSubmitting}>
                 <span>{isSubmitting ? 'Memproses...' : 'Login'}</span>

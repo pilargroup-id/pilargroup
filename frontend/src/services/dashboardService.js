@@ -23,6 +23,20 @@ const setupChecklist = [
 
 let isProjectLaunchInProgress = false
 
+// Saat user klik Back dari aplikasi project, browser bisa me-restore halaman ini
+// dari back-forward cache (bfcache) lengkap dengan overlay loading yang masih terbuka
+// dan flag launch yang masih true. Reset keduanya ketika halaman di-restore.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) {
+      return
+    }
+
+    isProjectLaunchInProgress = false
+    hideProjectLaunchScreen()
+  })
+}
+
 const SAML_PROJECTS = ['assetit']
 
 function isSamlProject(project) {
