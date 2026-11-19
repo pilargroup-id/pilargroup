@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, CircleCut } from '@untitledui/icons'
 
-import BackgroundMain from '@/components/Template/BackgroundMain'
 import { ApiError, changeProfile, getCurrentUser } from '@/services/api'
 
 function getInitialFormValues(user = {}) {
@@ -144,7 +143,6 @@ function ChangeProfileMobile({ isOpen = false, user, onClose, onUpdated }) {
       aria-labelledby="change-profile-mobile-title"
       aria-describedby="change-profile-mobile-description"
     >
-      <BackgroundMain />
 
       <form className="change-profile-mobile__shell" onSubmit={handleSubmit}>
         <div className="change-profile-mobile__card">

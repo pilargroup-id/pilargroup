@@ -343,12 +343,6 @@ function ProjectsCardView({ activePath = '/master-project' }) {
     ]
   }, [projects])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setFeedbackMessage(null)
-    void loadProjects()
-  }
-
   const handleOpenCreate = () => {
     setCreateError('')
     setCreatePopupOpen(true)
@@ -500,7 +494,7 @@ function ProjectsCardView({ activePath = '/master-project' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No master project found</p>
         <p className="dashboard-empty-state__detail">
-          Coba kata kunci lain atau gunakan refresh untuk menampilkan semua project.
+          Coba kata kunci lain atau kosongkan pencarian untuk menampilkan semua project.
         </p>
       </article>
     )
@@ -575,11 +569,6 @@ function ProjectsCardView({ activePath = '/master-project' }) {
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search master project',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath,
       }}
     >

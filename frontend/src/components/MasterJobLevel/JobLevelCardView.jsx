@@ -74,12 +74,6 @@ function JobLevelCardView({ activePath = '/master-job-level' }) {
     })
   }, [jobLevels, normalizedSearchQuery])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setFeedbackMessage(null)
-    void loadJobLevels()
-  }
-
   const handleOpenEdit = (jobLevel) => {
     setActionError('')
     setEditingJobLevel(jobLevel)
@@ -228,7 +222,7 @@ function JobLevelCardView({ activePath = '/master-job-level' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No master job level found</p>
         <p className="dashboard-empty-state__detail">
-          Coba kata kunci lain atau gunakan refresh untuk menampilkan semua job level.
+          Coba kata kunci lain atau kosongkan pencarian untuk menampilkan semua job level.
         </p>
       </article>
     )
@@ -299,11 +293,6 @@ function JobLevelCardView({ activePath = '/master-job-level' }) {
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search master job level',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath,
       }}
     >

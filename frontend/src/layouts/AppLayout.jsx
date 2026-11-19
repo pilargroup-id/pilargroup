@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { CircleCut } from '@untitledui/icons'
 
 import ChangeProfileMobile from '@/components/Template/ChangeProfileMobile'
-import BackgroundMain from '@/components/Template/BackgroundMain'
 import ChangeProfilePopup from '@/components/Template/ChangeProfilePopup'
 import Header from '@/components/Template/Header'
 import Sidebar from '@/components/Template/Sidebar'
@@ -140,10 +139,6 @@ function AppLayout({
     }
   }
 
-  const handleRefresh = () => {
-    headerProps.onRefresh?.()
-  }
-
   return (
     <div className={appShellClassName}>
       <Sidebar
@@ -161,24 +156,18 @@ function AppLayout({
 
       <div className="dashboard-stage">
         <Header
-          {...headerProps}
+          title={headerProps.title}
           hideBreadcrumb={headerProps.hideBreadcrumb}
-          directoryProps={{
-            rootLabel: headerProps.title ?? 'Pilargroup',
-            currentLabel: activePageLabel,
-          }}
-          onRefresh={handleRefresh}
+          directoryProps={{ currentLabel: activePageLabel }}
+          searchProps={headerProps.searchProps}
           showMenuButton={!isDesktop}
           onMenuToggle={() => setIsMobileSidebarOpen(true)}
-          userName={resolvedUser.name}
-          userRole={resolvedUser.role}
         />
 
         <main
           className="dashboard-main"
           style={{ position: 'relative', overflowX: 'hidden' }}
         >
-          <BackgroundMain />
           <div style={{ position: 'relative' }}>{children}</div>
         </main>
       </div>

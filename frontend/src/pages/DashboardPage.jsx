@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Browser } from '@untitledui/icons'
 import AppLayout from '@/layouts/AppLayout'
-import { sharedBreadcrumbItems } from '@/constants/breadcrumbs'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { getDashboardProjects, launchProject } from '@/services/dashboardService'
 
@@ -57,12 +56,6 @@ function DashboardPage({ activePath = '/dashboard' }) {
     )
   })
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setLaunchError('')
-    void loadProjects()
-  }
-
   let content = null
 
   if (isLoadingProjects) {
@@ -95,7 +88,7 @@ function DashboardPage({ activePath = '/dashboard' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No projects found</p>
         <p className="dashboard-empty-state__detail">
-          Try another keyword or use refresh to reset the search.
+          Try another keyword or clear the search.
         </p>
       </article>
     )
@@ -135,18 +128,13 @@ function DashboardPage({ activePath = '/dashboard' }) {
       headerProps={{
         title: 'Pilargroup',
         subtitle: 'Manage your recruitment process',
-        breadcrumb: sharedBreadcrumbItems,
+        hideBreadcrumb: true,
         searchProps: {
           value: searchQuery,
           placeholder: 'Search projects...',
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search projects',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         primaryActionLabel: 'Create',
         activePath,
       }}
@@ -158,7 +146,7 @@ function DashboardPage({ activePath = '/dashboard' }) {
           </div>
         ) : null}
 
-        <div className="dashboard-overview hide-scrollbar" style={{ overflowY: 'auto', flex: 1, paddingRight: '8px', paddingBottom: '24px', alignContent: 'start' }}>{content}</div>
+        <div className="dashboard-overview dashboard-overview--scroll hide-scrollbar">{content}</div>
       </section>
     </AppLayout>
   )

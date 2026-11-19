@@ -74,12 +74,6 @@ function CompaniesCardView({ activePath = '/master-companies' }) {
     })
   }, [companies, normalizedSearchQuery])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setFeedbackMessage(null)
-    void loadCompanies()
-  }
-
   const handleOpenEdit = (company) => {
     setActionError('')
     setEditingCompany(company)
@@ -251,7 +245,7 @@ function CompaniesCardView({ activePath = '/master-companies' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No master company found</p>
         <p className="dashboard-empty-state__detail">
-          Coba kata kunci lain atau gunakan refresh untuk menampilkan semua company.
+          Coba kata kunci lain atau kosongkan pencarian untuk menampilkan semua company.
         </p>
       </article>
     )
@@ -340,11 +334,6 @@ function CompaniesCardView({ activePath = '/master-companies' }) {
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search master company',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath,
       }}
     >

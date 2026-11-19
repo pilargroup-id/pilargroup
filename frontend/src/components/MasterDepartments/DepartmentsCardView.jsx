@@ -77,12 +77,6 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
     })
   }, [departments, normalizedSearchQuery])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setFeedbackMessage(null)
-    void loadDepartments()
-  }
-
   const handleOpenEdit = (department) => {
     setActionError('')
     setEditingDepartment(department)
@@ -229,7 +223,7 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No master department found</p>
         <p className="dashboard-empty-state__detail">
-          Coba kata kunci lain atau gunakan refresh untuk menampilkan semua department.
+          Coba kata kunci lain atau kosongkan pencarian untuk menampilkan semua department.
         </p>
       </article>
     )
@@ -302,11 +296,6 @@ function DepartmentsCardView({ activePath = '/master-departments' }) {
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search master department',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath,
       }}
     >

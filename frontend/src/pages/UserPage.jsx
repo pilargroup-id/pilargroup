@@ -134,11 +134,6 @@ function UserPage() {
     void loadUsers()
   }, [])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    void loadUsers()
-  }
-
   const handleDownloadTemplate = async () => {
     try {
       await downloadUserImportTemplate()
@@ -349,7 +344,7 @@ function UserPage() {
     : usersError
       ? usersError
       : normalizedSearchQuery
-        ? 'No users found. Try another keyword or use refresh to reset the search.'
+        ? 'No users found. Try another keyword or clear the search.'
         : 'No users available.'
 
   return (
@@ -359,11 +354,6 @@ function UserPage() {
         title: 'Pilargroup',
         subtitle: 'Manage your recruitment process',
         hideBreadcrumb: true,
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath: '/users',
       }}
     >

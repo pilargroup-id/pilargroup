@@ -80,12 +80,6 @@ function BUCardView({ activePath = '/business-unit' }) {
     })
   }, [businessUnits, normalizedSearchQuery])
 
-  const handleRefresh = () => {
-    setSearchQuery('')
-    setFeedbackMessage(null)
-    void loadBusinessUnits()
-  }
-
   const handleOpenEdit = (businessUnit) => {
     setActionError('')
     setEditingBusinessUnit(businessUnit)
@@ -257,7 +251,7 @@ function BUCardView({ activePath = '/business-unit' }) {
       <article className="dashboard-empty-state">
         <p className="dashboard-empty-state__title">No master business unit found</p>
         <p className="dashboard-empty-state__detail">
-          Coba kata kunci lain atau gunakan refresh untuk menampilkan semua business unit.
+          Coba kata kunci lain atau kosongkan pencarian untuk menampilkan semua business unit.
         </p>
       </article>
     )
@@ -362,11 +356,6 @@ function BUCardView({ activePath = '/business-unit' }) {
           onChange: (event) => setSearchQuery(event.target.value),
           ariaLabel: 'Search master business unit',
         },
-        notificationProps: {
-          ariaLabel: 'Open notifications',
-          modalTitle: 'Notifications',
-        },
-        onRefresh: handleRefresh,
         activePath,
       }}
     >
