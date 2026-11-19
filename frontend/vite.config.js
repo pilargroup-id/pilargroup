@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig(({ mode }) => {
@@ -7,6 +8,60 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        // Registrasi dilakukan manual di main.jsx
+        injectRegister: false,
+        includeAssets: [
+          'favicon-pwa.png',
+          'apple-touch-icon-pwa.png',
+        ],
+        manifest: {
+          id: '/',
+          name: 'Pilargroup Dashboard IT',
+          short_name: 'Pilargroup',
+          description: 'Internal dashboard PT. Pilar Niaga Makmur.',
+          lang: 'id',
+          theme_color: '#1f4e8c',
+          background_color: '#f7fbff',
+          display: 'standalone',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: 'maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+            { src: 'maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+        workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          globPatterns: ['**/*.{js,css,html,svg,png,webp,ico,woff,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          navigateFallback: '/index.html',
+          // Route backend (Laravel) TIDAK boleh dilayani oleh SPA fallback,
+          // kalau tidak flow SSO/SAML akan rusak (dapat index.html, bukan response backend).
+          navigateFallbackDenylist: [
+            /^\/api(\/|$)/,
+            /^\/saml(\/|$)/,
+            /^\/sso(\/|$)/,
+            /^\/sanctum(\/|$)/,
+            /^\/storage(\/|$)/,
+          ],
+          // Request API tidak pernah di-cache; selalu ke network
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+              handler: 'NetworkOnly',
+            },
+          ],
+        },
+        devOptions: {
+          enabled: false,
+        },
+      }),
     ],
     resolve: {
       alias: {
