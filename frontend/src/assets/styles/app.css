@@ -572,6 +572,10 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
+.mobile-search-bar {
+  display: none;
+}
+
 .add-board-button {
   position: relative;
   overflow: hidden;
@@ -3550,13 +3554,41 @@
     gap: 4px 8px;
   }
 
-  .header-search {
-    width: 100%;
-    margin: 0 0 6px;
+  /* Mobile: search dipindah ke bawah header */
+  .header-content > .header-search {
+    display: none;
   }
 
-  .header-search__input {
+  .mobile-search-bar {
+    display: block;
+    flex-shrink: 0;
+    padding: 16px 20px 0;
+    background: transparent;
+  }
+
+  .header-search--mobile {
+    width: 100%;
+    margin: 0;
+  }
+
+  .header-search--mobile .header-search__icon {
+    color: #667085;
+  }
+
+  .header-search--mobile .header-search__input {
     height: 44px;
+    border-color: #d0d5dd;
+    background: #fff;
+    color: #101828;
+    color-scheme: light;
+  }
+
+  .header-search--mobile .header-search__input::placeholder {
+    color: #98a2b3;
+  }
+
+  .header-search--mobile .header-search__input:focus-visible {
+    outline-color: var(--primary-blue);
   }
 
   .users-table-filter__grid {
@@ -3565,7 +3597,8 @@
 }
 
 @media (max-width: 480px) {
-  .header-content {
+  .header-content,
+  .mobile-search-bar {
     padding-inline: 16px;
   }
 

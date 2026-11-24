@@ -48,22 +48,40 @@ function Header({
           </nav>
         ) : null}
 
-        {searchProps ? (
-          <label className="header-search">
-            <SearchMd size={16} className="header-search__icon" aria-hidden="true" />
-            <input
-              type="search"
-              className="header-search__input"
-              value={searchProps.value ?? ''}
-              placeholder={searchProps.placeholder ?? 'Search...'}
-              onChange={searchProps.onChange}
-              aria-label={searchProps.ariaLabel ?? 'Search'}
-              autoComplete="off"
-            />
-          </label>
-        ) : null}
+        {searchProps ? <HeaderSearch searchProps={searchProps} /> : null}
       </div>
     </header>
+  )
+}
+
+function HeaderSearch({ searchProps, variant = 'header' }) {
+  const isMobile = variant === 'mobile'
+
+  return (
+    <label className={isMobile ? 'header-search header-search--mobile' : 'header-search'}>
+      <SearchMd size={16} className="header-search__icon" aria-hidden="true" />
+      <input
+        type="search"
+        className="header-search__input"
+        value={searchProps.value ?? ''}
+        placeholder={searchProps.placeholder ?? 'Search...'}
+        onChange={searchProps.onChange}
+        aria-label={searchProps.ariaLabel ?? 'Search'}
+        autoComplete="off"
+      />
+    </label>
+  )
+}
+
+export function MobileSearchBar({ searchProps }) {
+  if (!searchProps) {
+    return null
+  }
+
+  return (
+    <div className="mobile-search-bar">
+      <HeaderSearch searchProps={searchProps} variant="mobile" />
+    </div>
   )
 }
 

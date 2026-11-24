@@ -421,9 +421,9 @@
 @media (max-width: 920px) {
   .login-page {
     grid-template-columns: 1fr;
-    grid-template-rows: calc(40dvh / var(--app-zoom)) calc(60dvh / var(--app-zoom));
+    grid-template-rows: calc(30dvh / var(--app-zoom)) minmax(calc(70dvh / var(--app-zoom)), auto);
     min-height: calc(100dvh / var(--app-zoom));
-    background: linear-gradient(180deg, #2f4c86 0%, #2b4579 40%, #f6f7fa 40%, #f6f7fa 100%);
+    background: linear-gradient(180deg, #2f4c86 0%, #2b4579 calc(30dvh / var(--app-zoom)), #f6f7fa calc(30dvh / var(--app-zoom)), #f6f7fa 100%);
   }
 
   .login-page__hero {
@@ -449,7 +449,7 @@
 
   .login-page__panel {
     height: 100%;
-    margin-top: -56px;
+    margin-top: -80px;
     padding: 0 24px 24px;
     background: transparent;
     display: grid;
@@ -506,7 +506,7 @@
   }
 
   .login-page__panel {
-    margin-top: -48px;
+    margin-top: -72px;
     padding: 0 16px 14px;
   }
 

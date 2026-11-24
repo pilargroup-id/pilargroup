@@ -3,7 +3,7 @@ import { CircleCut } from '@untitledui/icons'
 
 import ChangeProfileMobile from '@/components/Template/ChangeProfileMobile'
 import ChangeProfilePopup from '@/components/Template/ChangeProfilePopup'
-import Header from '@/components/Template/Header'
+import Header, { MobileSearchBar } from '@/components/Template/Header'
 import Sidebar from '@/components/Template/Sidebar'
 import { useBreakpoint } from '@/hooks/use-breakpoint'
 import { getStoredUser } from '@/services/api'
@@ -163,6 +163,8 @@ function AppLayout({
           showMenuButton={!isDesktop}
           onMenuToggle={() => setIsMobileSidebarOpen(true)}
         />
+
+        <MobileSearchBar searchProps={headerProps.searchProps} />
 
         <main
           className="dashboard-main"
